@@ -1,6 +1,8 @@
 import { getAllShipped, getStats } from "../db.ts";
 import { computeRatio, historyTable, formatRatio, humanDuration } from "../format.ts";
+import { computeAchievements } from "../achievements.ts";
 import type { Session } from "../db.ts";
+import { c } from "../colors.ts";
 
 export interface HistoryArgs {
   json?: boolean;
@@ -9,6 +11,7 @@ export interface HistoryArgs {
 export function history(args: HistoryArgs = {}): number {
   const shippedSessions = getAllShipped();
   const stats = getStats();
+  const achievements = computeAchievements(shippedSessions);
 
   const ratios = shippedSessions.map((s) => computeRatio(s));
   const finiteRatios = ratios.filter((r) => isFinite(r));
@@ -28,6 +31,7 @@ export function history(args: HistoryArgs = {}): number {
           avgRatio,
           totalSavedHuman: humanDuration(stats.totalSavedMs),
         },
+        achievements,
         shipped: shippedSessions.map((s, i) => ({
           ...s,
           ratio: ratios[i],
@@ -50,5 +54,34 @@ export function history(args: HistoryArgs = {}): number {
       avgRatio,
     })
   );
+
+  // Achievements section
+  const earned = achievements.filter((a) => a.earned);
+  const inProgress = achievements.filter(
+    (a) => !a.earned && a.progress !== undefined && a.progress > 0
+  );
+
+  if (shippedSessions.length === 0) {
+    return 0;
+  }
+
+  console.log(c.brightYellow(c.bold("🏆 ACHIEVEMENTS")));
+  console.log(c.dim("─".repeat(74)));
+  if (earned.length === 0) {
+    console.log("  " + c.dim("Ship your first session to start earning these."));
+  } else {
+    for (const a of earned) {
+      console.log(`  ${c.brightGreen("✓")} ${c.bold(a.name)}  ${c.dim(a.description)}`);
+    }
+  }
+  if (inProgress.length > 0) {
+    console.log("");
+    console.log("  " + c.dim("In progress:"));
+    for (const a of inProgress) {
+      const pct = a.goal && a.progress !== undefined ? `${a.progress}/${a.goal}` : "—";
+      console.log(`  ${c.dim("○")} ${c.dim(a.name)}  ${c.dim(`(${pct})`)}`);
+    }
+  }
+  console.log("");
   return 0;
 }

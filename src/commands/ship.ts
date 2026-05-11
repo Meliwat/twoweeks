@@ -4,14 +4,17 @@ import { milestoneFor } from "../flair.ts";
 import { buildShareUrl, openUrl } from "./share.ts";
 import type { ShareTarget } from "./share.ts";
 import { c } from "../colors.ts";
+import { renderShipCard, defaultScreenshotPath, writeScreenshot } from "../screenshot.ts";
 
 export interface ShipArgs {
   share?: boolean;
   shareTarget?: ShareTarget;
+  screenshot?: boolean;
+  screenshotOut?: string;
   json?: boolean;
 }
 
-export function ship(args: ShipArgs): number {
+export async function ship(args: ShipArgs): Promise<number> {
   const active = getMostRecentActive();
   if (!active) {
     if (args.json) {
@@ -36,6 +39,19 @@ export function ship(args: ShipArgs): number {
   const target: ShareTarget = args.shareTarget ?? "x";
   const url = buildShareUrl(shipped, target);
 
+  let screenshotPath: string | undefined;
+  if (args.screenshot) {
+    try {
+      const png = await renderShipCard(shipped);
+      screenshotPath = args.screenshotOut ?? defaultScreenshotPath(shipped.id);
+      writeScreenshot(screenshotPath, png);
+    } catch (err) {
+      if (!args.json) {
+        console.error(c.brightRed("Screenshot failed:") + " " + (err as Error).message);
+      }
+    }
+  }
+
   if (args.json) {
     const actualMs = (shipped.shipped_at as number) - shipped.started_at;
     console.log(
@@ -50,6 +66,7 @@ export function ship(args: ShipArgs): number {
         milestone,
         share_url: url,
         share_target: target,
+        screenshot_path: screenshotPath,
       })
     );
     if (args.share) openUrl(url);
@@ -57,6 +74,11 @@ export function ship(args: ShipArgs): number {
   }
 
   console.log(resultCard(shipped, milestone));
+
+  if (screenshotPath) {
+    console.log(c.dim("📸 Screenshot: ") + c.bold(screenshotPath));
+    console.log("");
+  }
 
   if (args.share) {
     const targetName = target === "x" ? "X" : target === "bluesky" ? "Bluesky" : "Mastodon";
@@ -68,6 +90,7 @@ export function ship(args: ShipArgs): number {
     openUrl(url);
   } else {
     console.log(c.dim("Want to brag? Run: ") + c.bold(`twoweeks share ${shipped.id}`));
+    console.log(c.dim("Or generate a shareable PNG: ") + c.bold(`twoweeks screenshot ${shipped.id}`));
     console.log("");
   }
   return 0;

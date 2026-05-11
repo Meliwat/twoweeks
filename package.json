@@ -10,7 +10,7 @@
   },
   "scripts": {
     "cli": "bun run src/cli.ts",
-    "build": "bun build src/cli.ts --target=node --outfile=dist/cli.js && chmod +x dist/cli.js",
+    "build": "bun build src/cli.ts --target=node --packages=external --outfile=dist/cli.js && chmod +x dist/cli.js",
     "test": "bun test",
     "prepublishOnly": "bun run build && bun test",
     "start": "bun run src/cli.ts"
@@ -47,5 +47,9 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "satori": "^0.26.0"
   }
 }

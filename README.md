@@ -11,7 +11,7 @@
 
 A CLI that times the gap between your AI's confident estimate and your actual ship time. Built for the era where "this is a multi-month project" turns into a single Friday afternoon.
 
-![demo](assets/demo.gif)
+![the brag card](assets/social-preview.png)
 
 ```
 $ twoweeks "build the auth flow"
@@ -22,7 +22,7 @@ $ twoweeks "build the auth flow"
 
 # ... go build ...
 
-$ twoweeks ship
+$ twoweeks ship --screenshot
 
 🎯 SHIPPED
 ──────────────────────────────────────────
@@ -34,6 +34,8 @@ Saved:       13d 23h 12m
 ──────────────────────────────────────────
 
 🎯  Triple-digit compression. Your AI is recalibrating.
+
+📸 Screenshot: ~/.twoweeks/screenshots/compression-1.png
 
 Want to brag? Run: twoweeks share 1
 ```
@@ -53,7 +55,7 @@ git clone https://github.com/Meliwat/twoweeks
 cd twoweeks && bun install && bun link
 ```
 
-Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single local JSON file at `~/.twoweeks/history.json`. No native deps, no SQLite. Install is one binary, one shebang.
+Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single local JSON file at `~/.twoweeks/history.json`. No cloud, no telemetry, no accounts.
 
 ## Commands
 
@@ -64,8 +66,10 @@ Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single loca
 | `twoweeks status` | Same as bare command |
 | `twoweeks ship` | Close the most recent active session, print the brag card |
 | `twoweeks ship --share` | Ship and auto-open X with the brag pre-filled |
-| `twoweeks share [id]` | Open X with the brag for a shipped session (default: most recent) |
-| `twoweeks history` | Show all shipped sessions + lifetime stats |
+| `twoweeks ship --screenshot` | Ship and save a **1200×630 PNG of the brag card** (Open Graph dimensions, ready to share) |
+| `twoweeks screenshot [id]` | Render a PNG for a shipped session (default: most recent) |
+| `twoweeks share [id]` | Open X with the brag for a shipped session |
+| `twoweeks history` | Shipped sessions + lifetime stats + **achievements** |
 | `twoweeks abandon` | Abandon the current session (excluded from stats) |
 
 ## Flags
@@ -77,10 +81,19 @@ Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single loca
 | `--to-bluesky` | Share to Bluesky instead of X |
 | `--to-mastodon` | Share to Mastodon instead of X |
 | `--print` | Print the share URL instead of opening the browser |
-| `--json` | Emit machine-readable JSON (works on every command). Pipe into `jq`. |
+| `--screenshot` | (on `ship`) Also save a PNG of the brag card |
+| `--out <path>` | Output path for `screenshot` command |
+| `--open` | (on `screenshot`) Open the PNG after saving |
+| `--json` | Emit machine-readable JSON (every command). Pipe into `jq`. |
 | `--no-color` | Disable ANSI colors (also respects `NO_COLOR=1`) |
 | `--help, -h` | Show help |
 | `--version, -v` | Show version |
+
+## The brag card
+
+`twoweeks ship --screenshot` (or `twoweeks screenshot <id>`) renders a 1200×630 PNG of your compression result, sized exactly for Open Graph link previews. Drop it into a tweet, a Slack message, a presentation — it's designed to read as a self-contained brag.
+
+![sample brag card](assets/social-preview.png)
 
 ## Milestones
 
@@ -100,6 +113,17 @@ Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single loca
 | ≥ 0.5x | Slower than estimated, but not by much. The AI was almost right. |
 | < 0.5x | Significantly slower. The AI was, against all odds, correct. |
 
+## Achievements
+
+`twoweeks history` tracks 13 achievements with progress bars:
+
+- **First Ship** / **Hat Trick** / **Marathon** / **Centurion** (1, 3, 10, 100 ships)
+- **100x Club** / **1000x Club** / **Million-x Club** (compression milestones)
+- **Time Bender** (any instant ship)
+- **Estimation Slayer** (5 honest over-budget ships)
+- **Streak: 3 days** / **Streak: 7 days** (consecutive shipping days)
+- **Saved a Month** / **Saved a Year** (cumulative AI-time saved)
+
 ## How it works
 
 Every session gets stamped with an ETA (default: 2 weeks). When you ship, `twoweeks` computes the compression ratio:
@@ -108,7 +132,7 @@ Every session gets stamped with an ETA (default: 2 weeks). When you ship, `twowe
 ratio = eta_ms / actual_ms
 ```
 
-A 2-week estimate shipped in 47 minutes is ~428x compression. Ship in half the estimate and you get `2.00x`. Take three weeks when the AI said two? `0.667x`. The CLI then offers to open X (or Bluesky, or Mastodon) with a pre-filled brag for the world to enjoy.
+A 2-week estimate shipped in 47 minutes is ~428x compression. The CLI then offers to open X (or Bluesky, or Mastodon) with a pre-filled brag, or generate a sharable PNG.
 
 ## Scripting
 
@@ -118,8 +142,8 @@ Every command supports `--json` for piping:
 $ twoweeks ship --json | jq '.ratio_formatted'
 "428x"
 
-$ twoweeks history --json | jq '.stats.bestRatio'
-1247.34
+$ twoweeks history --json | jq '.achievements[] | select(.earned)'
+{ "id": "first_ship", "name": "First Ship", ... }
 
 $ twoweeks --json | jq '.active[].task'
 "build the auth flow"
@@ -127,9 +151,7 @@ $ twoweeks --json | jq '.active[].task'
 
 ## Storage
 
-Local JSON at `~/.twoweeks/history.json`. One file, human-readable, easy to back up. No cloud. No accounts. No telemetry. Override with `TWOWEEKS_HOME=/somewhere/else`.
-
-Your AI's overconfidence stays between you and your terminal.
+Local JSON at `~/.twoweeks/history.json`. PNG brag cards at `~/.twoweeks/screenshots/`. No cloud. No accounts. No telemetry. Override with `TWOWEEKS_HOME=/somewhere/else`.
 
 ## Development
 
@@ -137,7 +159,7 @@ Your AI's overconfidence stays between you and your terminal.
 bun install            # install dev dependencies
 bun run cli "task"     # run from source
 bun test               # run the test suite (39 tests)
-bun run build          # build dist/cli.js (Node-compatible bundle)
+bun run build          # build dist/cli.js
 ```
 
 ## License

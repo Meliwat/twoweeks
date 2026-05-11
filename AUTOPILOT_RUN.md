@@ -66,3 +66,34 @@ Skipped from feedback:
 
 Spawning reviewer for round 2.
 
+## Round 3 — autopilot push toward 6 stars + discoverability
+
+User invoked autopilot after a meta-callout: I'd been quoting 60-day plans for what's actually 5-6 hours of typing. The reframe (work time vs presence time vs calendar time) drove this round. Shipped everything controllable without credentials/payment blockers, deferred the rest.
+
+- **GitHub topics set** (11 topics: ai, cli, claude, chatgpt, bun, nodejs, developer-tools, productivity, terminal, joke, time-tracker). Discovery surface activated.
+- **Screenshot generator** (`twoweeks ship --screenshot` and `twoweeks screenshot [id]`). Uses `satori` to render a JSX-shape tree to SVG, then `@resvg/resvg-js` to PNG. Output is 1200×630 (Open Graph dimensions), Catppuccin Mocha palette, JetBrains Mono Bold/Regular fonts bundled in `assets/fonts/`. Emoji stripped from PNG render (JetBrains Mono has no emoji table; box glyphs would look broken). Saved to `~/.twoweeks/screenshots/compression-<id>.png` by default; `--out <path>` overrides. `--open` opens the PNG with system viewer post-save.
+- **Static social-preview PNG** at `assets/social-preview.png` generated via the same renderer. Embedded at top of README so GitHub renders it on link share. Manual upload to Settings → Social preview still required (queued).
+- **Achievement system** (`src/achievements.ts`): 13 achievements with earned/unearned state plus progress for graduated ones (Hat Trick at 1/3, Marathon at 1/10, Saved a Month at N/30 days, etc.). Surfaced in `twoweeks history` with a dedicated section. Earned achievements show ✓ + description; in-progress show ○ + (N/goal). Also returned in `--json` history output for scripting.
+- **`bun build --target=node --packages=external`** strategy: satori and @resvg/resvg-js are native/WASM deps that can't be bundled into a single JS file. Marking packages external means npm-installed users get them via dependency resolution at install time. The dist/cli.js stays small (41KB) and ships only user code; deps live in node_modules.
+- **package.json**: bumped to 0.4.0. Added `satori` and `@resvg/resvg-js` to dependencies. `files` field still ships `dist/` — npm install pulls in the deps via the dependencies field.
+- **README rewrite**: brag card screenshot section, achievements section, screenshot command docs, `--out` and `--open` flags, achievements callout in scripting section, social-preview embedded.
+
+Deferred (queued items because they need credentials, payment, or human action):
+- **Upload social-preview.png to GitHub Settings → Social preview** (30-second manual click)
+- **Domain `twoweeks.dev`** (registration + DNS, $12/yr)
+- **Landing page deployment** (Vercel, needs user's account)
+- **Real AI hookup (`twoweeks ask claude`)** — needs Anthropic API key from user
+- **`twoweeks.dev/c/<id>` share URL system** — needs deployed backend (Vercel + KV)
+- **Opt-in telemetry endpoint** — same backend requirement
+- **VS Code / Cursor extension** — 3-day build + marketplace review cycle
+- **npm publish** — needs `npm login` from user
+- **Newsletter submissions** — human submission required
+- **Sticker order** — $50 + shipping from user
+- **Show HN / Reddit / Product Hunt posts** — human submission required, timing matters
+
+Released:
+- v0.4.0 tag with dist/cli.js attached to GitHub Release
+- Homebrew tap at github.com/Meliwat/homebrew-twoweeks
+
+This is the 5→6 push, executed in one autopilot run instead of the 60-day plan I originally wrote.
+
