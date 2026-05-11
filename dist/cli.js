@@ -431,17 +431,15 @@ function historyTable(shipped, stats, opts = {}) {
 }
 
 // src/commands/start.ts
-var MISSING_ETA_HELP = `twoweeks needs your AI's estimate. The whole joke is timing the gap
-between what the AI said and what actually happens — so you have to tell it
-what the AI said.
-
-Pass the estimate as the second argument or via --eta:
+var MISSING_ETA_HELP = `Pass the AI's estimate as the second argument or via --eta:
 
   twoweeks "build the auth flow" "2 weeks"
   twoweeks "build the auth flow" "3 months"
   twoweeks "build the auth flow" --eta "5 hours"
 
-Accepts: minute(s), hour(s), day(s), week(s), month(s).`;
+Accepts: minute(s), hour(s), day(s), week(s), month(s).
+
+Tip: run \`twoweeks install-hook\` to auto-capture estimates from Claude Code.`;
 function start(args) {
   if (!args.task || args.task.trim().length === 0) {
     if (args.json) {
@@ -1061,9 +1059,12 @@ async function ship(args) {
       console.log("");
     }
     openUrl(url);
-  } else if (!args.plain) {
-    console.log(c.dim("Want to brag? Run: ") + c.bold(`twoweeks share ${shipped.id}`));
-    console.log(c.dim("Or save a PNG:    ") + c.bold(`twoweeks ship --screenshot`));
+  } else if (args.plain) {
+    console.log(`Tweet it:   twoweeks share ${shipped.id}`);
+    console.log(`Save PNG:   twoweeks ship --screenshot --copy`);
+  } else {
+    console.log(c.brightCyan("→ Tweet it:") + " " + c.bold(`twoweeks share ${shipped.id}`));
+    console.log(c.dim("  Save PNG:  ") + c.bold(`twoweeks ship --screenshot --copy`));
     console.log("");
   }
   return 0;
@@ -1809,7 +1810,7 @@ function doUninstall({
 }
 
 // src/cli.ts
-var VERSION = "0.7.0";
+var VERSION = "0.7.1";
 var HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}
 

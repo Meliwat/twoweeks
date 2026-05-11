@@ -1,5 +1,4 @@
-// Status flair messages. Kept small and punchy on purpose — the joke wears
-// out fast if every status line tries to be clever.
+// Status flair messages. Small and punchy on purpose.
 const STATUS_MESSAGES = [
   "The AI was sure of it.",
   "Plenty of time.",
