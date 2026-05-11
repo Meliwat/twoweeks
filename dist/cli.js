@@ -542,32 +542,33 @@ import { spawn } from "node:child_process";
 import { platform } from "node:os";
 var REPO_URL = "https://github.com/Meliwat/twoweeks";
 var SHARE_VARIANTS = [
-  ({ eta, ratio, duration, quote }) => `My AI said "${eta}". I shipped in ${duration}.
+  ({ eta, ratio, duration, quote }) => `AI said "${eta}". Also AI: shipped in ${duration}.
 
 Compression: ${ratio}.${quote ? `
 
 The AI's exact words: "${quote}"` : ""}
 
 twoweeks ⚙️ ${REPO_URL}`,
-  ({ eta, ratio, duration }) => `I beat my AI's "${eta}" estimate by ${ratio}.
+  ({ eta, ratio, duration }) => `AI estimate: "${eta}".
+AI delivery: ${duration}.
 
-Actual ship time: ${duration}.
+AI beat AI by ${ratio}.
 
 twoweeks ⚙️ ${REPO_URL}`,
   ({ eta, ratio, duration }) => `AI: "About ${eta} of focused work."
-Me: ${duration}.
+Also AI: ${duration}.
 
-${ratio} faster than predicted.
+${ratio} faster than the AI predicted itself would be.
 
 ${REPO_URL}`,
   ({ eta, ratio, duration }) => `${ratio} compression on today's ship.
 
-The AI quoted ${eta}. I quoted ${duration}.
+The AI quoted ${eta}. The AI shipped ${duration}.
 
 ${REPO_URL}`,
-  ({ eta, ratio, duration, challenge }) => `Just beat my AI's "${eta}" estimate by ${ratio} (shipped in ${duration}).${challenge ? `
+  ({ eta, ratio, duration, challenge }) => `AI said "${eta}". AI shipped in ${duration}. ${ratio}.${challenge ? `
 
-${challenge} bet you can't top this.` : ""}
+${challenge} bet your AI can't top mine.` : ""}
 
 ${REPO_URL}`
 ];
@@ -1810,7 +1811,7 @@ function doUninstall({
 }
 
 // src/cli.ts
-var VERSION = "0.7.1";
+var VERSION = "0.7.2";
 var HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}
 
