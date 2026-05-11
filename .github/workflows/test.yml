@@ -33,11 +33,16 @@ jobs:
         run: |
           export TWOWEEKS_HOME=/tmp/tw-smoke-$$
           bun ./dist/cli.js --version
-          bun ./dist/cli.js "smoke test"
+          # Manual flow: explicit ETA (required since v0.5.0)
+          bun ./dist/cli.js "smoke test" "2 weeks"
           bun ./dist/cli.js ship --json > /tmp/ship.json
           cat /tmp/ship.json
-          # Verify JSON is valid
           bun -e "JSON.parse(require('fs').readFileSync('/tmp/ship.json', 'utf-8'))"
+          # Auto-capture flow: estimate read from piped text
+          export TWOWEEKS_HOME=/tmp/tw-smoke-watch-$$
+          echo "Sure, this should take about 2 weeks of focused work." | bun ./dist/cli.js watch --json > /tmp/watch.json
+          cat /tmp/watch.json
+          bun -e "const r = JSON.parse(require('fs').readFileSync('/tmp/watch.json', 'utf-8')); if (!r.ok || r.session.eta_text !== '2 weeks') { console.error('auto-capture did not produce expected session'); process.exit(1) }"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -48,6 +53,10 @@ jobs:
         run: |
           export TWOWEEKS_HOME=/tmp/tw-smoke-node-$$
           node ./dist/cli.js --version
-          node ./dist/cli.js "smoke test"
+          node ./dist/cli.js "smoke test" "2 weeks"
           node ./dist/cli.js ship --json | tee /tmp/ship.json
           node -e "JSON.parse(require('fs').readFileSync('/tmp/ship.json', 'utf-8'))"
+          export TWOWEEKS_HOME=/tmp/tw-smoke-node-watch-$$
+          echo "Sure, this should take about 2 weeks of focused work." | node ./dist/cli.js watch --json > /tmp/watch.json
+          cat /tmp/watch.json
+          node -e "const r = JSON.parse(require('fs').readFileSync('/tmp/watch.json', 'utf-8')); if (!r.ok || r.session.eta_text !== '2 weeks') { console.error('auto-capture did not produce expected session'); process.exit(1) }"
