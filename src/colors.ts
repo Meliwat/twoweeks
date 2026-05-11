@@ -1,10 +1,17 @@
-// Minimal ANSI color helper. Strips colors when stdout is not a TTY (pipes, CI, redirects).
-const TTY = process.stdout.isTTY;
-const NO_COLOR = process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "";
-const ENABLED = TTY && !NO_COLOR;
+// Minimal ANSI color helper. Strips colors when stdout is not a TTY, when
+// NO_COLOR is set (per https://no-color.org), or when --no-color was passed.
+// Detection happens LAZILY on every call so flags processed after import still
+// take effect.
+function colorsEnabled(): boolean {
+  if (!process.stdout.isTTY) return false;
+  const nc = process.env.NO_COLOR;
+  if (nc !== undefined && nc !== "") return false;
+  return true;
+}
 
 function wrap(code: string): (text: string) => string {
-  return (text: string) => (ENABLED ? `\x1b[${code}m${text}\x1b[0m` : text);
+  return (text: string) =>
+    colorsEnabled() ? `\x1b[${code}m${text}\x1b[0m` : text;
 }
 
 export const c = {
@@ -27,4 +34,4 @@ export const c = {
   bgRed: wrap("41"),
 };
 
-export const isColorEnabled = ENABLED;
+export const isColorEnabled = colorsEnabled;
