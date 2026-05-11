@@ -1,6 +1,6 @@
 {
   "name": "twoweeks",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Why your AI assistant always says two weeks but you ship by lunch.",
   "author": "meliwat",
   "license": "MIT",
@@ -27,11 +27,19 @@
     "ai",
     "claude",
     "chatgpt",
+    "copilot",
+    "cursor",
     "estimate",
+    "estimation",
     "cli",
-    "joke",
+    "developer-tools",
     "productivity",
-    "time-tracker"
+    "time-tracker",
+    "humor",
+    "brag",
+    "shipping",
+    "open-graph",
+    "screenshot"
   ],
   "homepage": "https://github.com/Meliwat/twoweeks",
   "repository": {

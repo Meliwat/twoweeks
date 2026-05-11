@@ -7,7 +7,10 @@ import { c } from "../colors.ts";
 export interface StartArgs {
   task: string;
   eta?: string;
+  quote?: string;
   force?: boolean;
+  plain?: boolean;
+  noEmoji?: boolean;
   json?: boolean;
 }
 
@@ -27,6 +30,8 @@ export function start(args: StartArgs): number {
   if (!args.task || args.task.trim().length === 0) {
     if (args.json) {
       console.error(JSON.stringify({ ok: false, error: "task is required" }));
+    } else if (args.plain) {
+      console.error('Error: task is required. Try: twoweeks "build the auth flow" "2 weeks"');
     } else {
       console.error(c.brightRed("Error:") + ' task is required. Try: twoweeks "build the auth flow" "2 weeks"');
     }
@@ -36,6 +41,9 @@ export function start(args: StartArgs): number {
   if (!args.eta) {
     if (args.json) {
       console.error(JSON.stringify({ ok: false, error: "eta_required", hint: "twoweeks needs the AI's estimate; pass it as the second arg or via --eta" }));
+    } else if (args.plain) {
+      console.error("Error: missing AI estimate.\n");
+      console.error(MISSING_ETA_HELP);
     } else {
       console.error("");
       console.error(c.brightRed("Error: missing AI estimate."));
@@ -57,6 +65,9 @@ export function start(args: StartArgs): number {
           hint: "ship or abandon first, or use --force",
         })
       );
+    } else if (args.plain) {
+      console.error(`Warning: active session "${active.task}" started ${new Date(active.started_at).toLocaleString()}.`);
+      console.error("Ship or abandon it first, or rerun with --force to start a new one.");
     } else {
       console.log("");
       console.log(`${c.brightYellow("⚠️")}  You already have an active session: ${c.bold(active.task)}`);
@@ -75,18 +86,20 @@ export function start(args: StartArgs): number {
     const msg = (err as Error).message;
     if (args.json) {
       console.error(JSON.stringify({ ok: false, error: msg }));
+    } else if (args.plain) {
+      console.error("Error: " + msg);
     } else {
       console.error(c.brightRed("Error:") + " " + msg);
     }
     return 1;
   }
 
-  const session = createSession(args.task.trim(), eta.text, eta.ms);
+  const session = createSession(args.task.trim(), eta.text, eta.ms, args.quote);
 
   if (args.json) {
     console.log(JSON.stringify({ ok: true, session }));
   } else {
-    console.log(startCard(session, randomFlair()));
+    console.log(startCard(session, randomFlair(), { plain: args.plain, noEmoji: args.noEmoji }));
   }
   return 0;
 }

@@ -9,20 +9,45 @@ export type ShareTarget = "x" | "bluesky" | "mastodon";
 
 const REPO_URL = "https://github.com/Meliwat/twoweeks";
 
-function shareText(session: Session): string {
-  if (session.shipped_at === null || session.shipped_at === undefined) {
-    throw new Error("Cannot share unshipped session");
-  }
+// Five share-text variants. Algorithms downrank near-duplicate text, so
+// randomize per share. Each variant keeps the receipts (eta, actual, ratio) and
+// a link to the repo so the brag is recruiting.
+const SHARE_VARIANTS: Array<(args: { eta: string; ratio: string; duration: string; quote?: string; challenge?: string }) => string> = [
+  ({ eta, ratio, duration, quote }) =>
+    `My AI said "${eta}". I shipped in ${duration}.\n\nCompression: ${ratio}.${quote ? `\n\nThe AI's exact words: "${quote}"` : ""}\n\ntwoweeks ⚙️ ${REPO_URL}`,
+  ({ eta, ratio, duration }) =>
+    `I beat my AI's "${eta}" estimate by ${ratio}.\n\nActual ship time: ${duration}.\n\ntwoweeks ⚙️ ${REPO_URL}`,
+  ({ eta, ratio, duration }) =>
+    `AI: "About ${eta} of focused work."\nMe: ${duration}.\n\n${ratio} faster than predicted.\n\n${REPO_URL}`,
+  ({ eta, ratio, duration }) =>
+    `${ratio} compression on today's ship.\n\nThe AI quoted ${eta}. I quoted ${duration}.\n\n${REPO_URL}`,
+  ({ eta, ratio, duration, challenge }) =>
+    `Just beat my AI's "${eta}" estimate by ${ratio} (shipped in ${duration}).${challenge ? `\n\n${challenge} bet you can't top this.` : ""}\n\n${REPO_URL}`,
+];
+
+function pickShareVariant(session: Session, options: { challenge?: string } = {}): string {
+  if (!session.shipped_at) throw new Error("Cannot share unshipped session");
   const actualMs = session.shipped_at - session.started_at;
   const ratio = computeRatio(session);
   const duration = humanDuration(actualMs);
   const ratioText = formatRatio(ratio);
 
-  return `I beat my AI's "${session.eta_text}" estimate by ${ratioText}.\n\nActual ship time: ${duration}.\n\ntwoweeks ⚙️ ${REPO_URL}`;
+  const variant = SHARE_VARIANTS[Math.floor(Math.random() * SHARE_VARIANTS.length)];
+  return variant({
+    eta: session.eta_text,
+    ratio: ratioText,
+    duration,
+    quote: session.quote,
+    challenge: options.challenge,
+  });
 }
 
-export function buildShareUrl(session: Session, target: ShareTarget = "x"): string {
-  const text = shareText(session);
+export function buildShareUrl(
+  session: Session,
+  target: ShareTarget = "x",
+  options: { challenge?: string } = {}
+): string {
+  const text = pickShareVariant(session, options);
   switch (target) {
     case "x":
       return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
@@ -38,15 +63,14 @@ export function openUrl(url: string): void {
     platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
   try {
     spawn(cmd, [url], { detached: true, stdio: "ignore" }).unref();
-  } catch {
-    // Fail silently; URL was printed already
-  }
+  } catch {}
 }
 
 export interface ShareArgs {
   id?: number;
   target?: ShareTarget;
   print?: boolean;
+  challenge?: string;
   json?: boolean;
 }
 
@@ -70,7 +94,7 @@ export function share(args: ShareArgs): number {
     return 1;
   }
   const target: ShareTarget = args.target ?? "x";
-  const url = buildShareUrl(session, target);
+  const url = buildShareUrl(session, target, { challenge: args.challenge });
 
   if (args.json) {
     console.log(JSON.stringify({ ok: true, url, target, session_id: session.id }));

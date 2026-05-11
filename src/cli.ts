@@ -9,53 +9,55 @@ import { screenshotCmd } from "./commands/screenshot.ts";
 import { c } from "./colors.ts";
 import type { ShareTarget } from "./commands/share.ts";
 
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 
 const HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}
 
-${c.italic("Time the gap between your AI's estimate and your actual ship time.")}
+${c.italic("Capture your AI's confident estimate. Time the gap. Brag.")}
 
 ${c.bold("Usage:")}
-  ${c.bold("twoweeks \"task\" \"<eta>\"")}        Start a timer with the AI's stated estimate
-  ${c.bold("twoweeks")}                       Show all active sessions + flair
-  ${c.bold("twoweeks status")}                Same as bare command
-  ${c.bold("twoweeks ship")}                  Ship the most recent active session
-  ${c.bold("twoweeks ship --share")}          Ship and open X with brag pre-filled
-  ${c.bold("twoweeks ship --screenshot")}     Ship and save a 1200x630 PNG of the brag card
-  ${c.bold("twoweeks screenshot [id]")}       Render a PNG for a shipped session
-  ${c.bold("twoweeks share [id]")}            Open X intent (default: most recent shipped)
-  ${c.bold("twoweeks history")}               Show shipped sessions + lifetime stats + achievements
-  ${c.bold("twoweeks abandon")}               Abandon the most recent active session
+  ${c.bold("twoweeks \"task\" \"<eta>\"")}         Start a timer with the AI's stated estimate  ${c.dim("(required)")}
+  ${c.bold("twoweeks")}                        Show all active sessions + flair
+  ${c.bold("twoweeks status")}                 Same as bare command
+  ${c.bold("twoweeks ship")}                   Ship the most recent active session
+  ${c.bold("twoweeks ship --share")}           Ship and open X with brag pre-filled
+  ${c.bold("twoweeks ship --screenshot")}      Ship and save a 1200x630 PNG brag card
+  ${c.bold("twoweeks screenshot [id]")}        Render a PNG for a shipped session
+  ${c.bold("twoweeks share [id]")}             Open X intent (default: most recent shipped)
+  ${c.bold("twoweeks history")}                Show shipped sessions + lifetime stats + achievements
+  ${c.bold("twoweeks abandon")}                Abandon the most recent active session
 
 ${c.bold("Examples:")}
   ${c.dim("# AI said it'd take 2 weeks. You actually shipped in 47 minutes.")}
   ${c.bold("$ twoweeks \"build the auth flow\" \"2 weeks\"")}
-  ${c.bold("$ twoweeks ship --screenshot")}
-  ${c.dim("# Compression: 428x faster than the AI thought")}
+  ${c.bold("$ twoweeks ship --screenshot --copy")}
+  ${c.dim("# Compression: 428x faster than the AI thought (and the PNG is on your clipboard)")}
 
 ${c.bold("Flags:")}
-  ${c.bold("--eta \"<duration>\"")}             Provide AI estimate via flag instead of positional
-  ${c.bold("--force")}                        Start a new session even if one is active
-  ${c.bold("--to-bluesky")}                   Share to Bluesky instead of X
-  ${c.bold("--to-mastodon")}                  Share to Mastodon instead of X
-  ${c.bold("--print")}                        Print the share URL instead of opening
-  ${c.bold("--screenshot")}                   (on ship) Also save a PNG of the brag card
-  ${c.bold("--out <path>")}                   Output path for screenshot command
-  ${c.bold("--open")}                         (on screenshot) Open the PNG after saving
-  ${c.bold("--json")}                         Emit machine-readable JSON
-  ${c.bold("--no-color")}                     Disable ANSI colors (also set ${c.italic("NO_COLOR=1")})
-  ${c.bold("--help, -h")}                     Show this help
-  ${c.bold("--version, -v")}                  Show version
-
-${c.bold("ETA format:")}
-  ${c.dim("Examples: \"2 weeks\", \"3 months\", \"1 day\", \"5 hours\", \"30 minutes\"")}
+  ${c.bold("--eta \"<duration>\"")}              AI estimate via flag instead of second positional
+  ${c.bold("--quote \"<text>\"")}                Verbatim AI quote (rendered on the brag card)
+  ${c.bold("--force")}                         Start a new session even if one is already active
+  ${c.bold("--to-bluesky")}                    Share to Bluesky instead of X
+  ${c.bold("--to-mastodon")}                   Share to Mastodon instead of X
+  ${c.bold("--print")}                         Print the share URL instead of opening
+  ${c.bold("--screenshot")}                    (on ship) Save a PNG of the brag card
+  ${c.bold("--copy")}                          (on ship/screenshot, macOS) Copy the PNG to clipboard
+  ${c.bold("--out <path>")}                    Output path for screenshot command
+  ${c.bold("--open")}                          (on screenshot) Open the PNG after saving
+  ${c.bold("--plain")}                         Plain text (no colors / box drawing / emoji)
+  ${c.bold("--no-color")}                      Disable ANSI colors (also set ${c.italic("NO_COLOR=1")})
+  ${c.bold("--no-emoji")}                      Strip emoji (also set ${c.italic("TWOWEEKS_NO_EMOJI=1")})
+  ${c.bold("--json")}                          Machine-readable JSON output
+  ${c.bold("--help, -h")}                      Show this help
+  ${c.bold("--version, -v")}                   Show version
 
 ${c.bold("Storage:")}
-  ${c.dim("~/.twoweeks/history.json")}       ${c.dim("local JSON, no telemetry, no cloud")}
-  ${c.dim("~/.twoweeks/screenshots/")}       ${c.dim("PNG brag cards (1200x630, Open Graph)")}
-  ${c.dim("$TWOWEEKS_HOME")}                 ${c.dim("override storage directory")}
-  ${c.dim("$TWOWEEKS_DEBUG")}                ${c.dim("=1 prints stack on unexpected errors")}
+  ${c.dim("~/.twoweeks/history.json")}        ${c.dim("local JSON, no telemetry, no cloud")}
+  ${c.dim("~/.twoweeks/screenshots/")}        ${c.dim("PNG brag cards (with .alt.txt sidecars)")}
+  ${c.dim("$TWOWEEKS_HOME")}                  ${c.dim("override storage directory")}
+  ${c.dim("$TWOWEEKS_NO_EMOJI")}              ${c.dim("=1 strips emoji from output")}
+  ${c.dim("$TWOWEEKS_DEBUG")}                 ${c.dim("=1 prints stack on unexpected errors")}
 `;
 
 interface ParsedArgs {
@@ -67,14 +69,24 @@ interface ParsedArgs {
   json?: boolean;
   screenshot?: boolean;
   open?: boolean;
+  copy?: boolean;
+  plain?: boolean;
+  noEmoji?: boolean;
   out?: string;
   eta?: string;
+  quote?: string;
+  challenge?: string;
   shareTarget?: ShareTarget;
 }
 
 export function parseArgs(argv: string[]): { args: ParsedArgs; positional: string[] } {
   const args: ParsedArgs = {};
   const positional: string[] = [];
+
+  // Pick up env defaults first (flag wins if both present)
+  if (process.env.TWOWEEKS_NO_EMOJI && process.env.TWOWEEKS_NO_EMOJI !== "0" && process.env.TWOWEEKS_NO_EMOJI.toLowerCase() !== "false") {
+    args.noEmoji = true;
+  }
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -86,6 +98,12 @@ export function parseArgs(argv: string[]): { args: ParsedArgs; positional: strin
     else if (a === "--json") args.json = true;
     else if (a === "--screenshot") args.screenshot = true;
     else if (a === "--open") args.open = true;
+    else if (a === "--copy") args.copy = true;
+    else if (a === "--plain") {
+      args.plain = true;
+      process.env.NO_COLOR = "1";
+      args.noEmoji = true;
+    } else if (a === "--no-emoji") args.noEmoji = true;
     else if (a === "--to-bluesky") args.shareTarget = "bluesky";
     else if (a === "--to-mastodon") args.shareTarget = "mastodon";
     else if (a === "--to-x" || a === "--to-twitter") args.shareTarget = "x";
@@ -96,6 +114,16 @@ export function parseArgs(argv: string[]): { args: ParsedArgs; positional: strin
       i++;
     } else if (a.startsWith("--eta=")) {
       args.eta = a.slice("--eta=".length);
+    } else if (a === "--quote") {
+      args.quote = argv[i + 1];
+      i++;
+    } else if (a.startsWith("--quote=")) {
+      args.quote = a.slice("--quote=".length);
+    } else if (a === "--challenge") {
+      args.challenge = argv[i + 1];
+      i++;
+    } else if (a.startsWith("--challenge=")) {
+      args.challenge = a.slice("--challenge=".length);
     } else if (a === "--out") {
       args.out = argv[i + 1];
       i++;
@@ -139,7 +167,7 @@ async function main(): Promise<number> {
   const command = positional[0];
 
   if (!command || command === "status") {
-    return status({ json: !!args.json });
+    return status({ json: !!args.json, plain: !!args.plain, noEmoji: !!args.noEmoji });
   }
 
   if (command === "ship") {
@@ -148,6 +176,9 @@ async function main(): Promise<number> {
       shareTarget: args.shareTarget,
       screenshot: !!args.screenshot,
       screenshotOut: args.out,
+      copy: !!args.copy,
+      plain: !!args.plain,
+      noEmoji: !!args.noEmoji,
       json: !!args.json,
     });
   }
@@ -165,6 +196,8 @@ async function main(): Promise<number> {
       id,
       out: args.out,
       open: !!args.open,
+      copy: !!args.copy,
+      plain: !!args.plain,
       json: !!args.json,
     });
   }
@@ -182,16 +215,17 @@ async function main(): Promise<number> {
       id,
       target: args.shareTarget,
       print: args.print,
+      challenge: args.challenge,
       json: !!args.json,
     });
   }
 
   if (command === "abandon") {
-    return abandon({ json: !!args.json });
+    return abandon({ json: !!args.json, plain: !!args.plain });
   }
 
   if (command === "history" || command === "board") {
-    return history({ json: !!args.json });
+    return history({ json: !!args.json, plain: !!args.plain, noEmoji: !!args.noEmoji });
   }
 
   // First positional is the task. Second positional (if not a known subcommand)
@@ -205,7 +239,10 @@ async function main(): Promise<number> {
   return start({
     task,
     eta: etaInput,
+    quote: args.quote,
     force: !!args.force,
+    plain: !!args.plain,
+    noEmoji: !!args.noEmoji,
     json: !!args.json,
   });
 }

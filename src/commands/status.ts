@@ -5,6 +5,8 @@ import { c } from "../colors.ts";
 
 export interface StatusArgs {
   json?: boolean;
+  plain?: boolean;
+  noEmoji?: boolean;
 }
 
 export function status(args: StatusArgs = {}): number {
@@ -16,15 +18,19 @@ export function status(args: StatusArgs = {}): number {
   }
 
   if (sessions.length === 0) {
-    console.log("");
-    console.log(c.dim("No active sessions."));
-    console.log("");
-    console.log(c.dim("Start one: ") + c.bold('twoweeks "build the auth flow"'));
-    console.log("");
+    if (args.plain) {
+      console.log('No active sessions. Start one: twoweeks "build the auth flow" "2 weeks"');
+    } else {
+      console.log("");
+      console.log(c.dim("No active sessions."));
+      console.log("");
+      console.log(c.dim("Start one: ") + c.bold('twoweeks "build the auth flow" "2 weeks"'));
+      console.log("");
+    }
     return 0;
   }
   for (const s of sessions) {
-    console.log(statusCard(s, randomFlair()));
+    console.log(statusCard(s, randomFlair(), { plain: args.plain, noEmoji: args.noEmoji }));
   }
   return 0;
 }

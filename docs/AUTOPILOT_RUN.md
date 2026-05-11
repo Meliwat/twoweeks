@@ -114,3 +114,66 @@ Changes:
 
 Honest framing: this was a bug that office-hours rigor caught while I was already in autopilot mode. The product is now actually what the joke claims it is.
 
+## Round 5 — six-star push + discoverability (v0.6.0, 2026-05-11)
+
+User asked: "make this as easy and accessible and viral as possible. Spawn 5 parallel reviewers, run their findings on autopilot, have something ready when I get back." Then: "what you can to 6 stars and push, ensure we make the repo discoverable as well."
+
+Spawned 5 parallel reviewer agents:
+1. **First-use UX** (npm-blocker reviewer): install path order, error first impressions, broken Homebrew formula link
+2. **Viral mechanics**: friction-to-share analysis, copy-paste-ability, brag-card legibility on social
+3. **Accessibility**: WCAG contrast, screen-reader compatibility, color-blind affordances, terminal feature assumptions
+4. **Adoption skeptic**: "would you actually leave this installed past Tuesday"
+5. **Asymmetric feature**: what's missing that would make the tool itself viral (verifiable receipts, asymmetric sharing)
+
+Convergence: all five flagged WCAG contrast (dim text at 3.4:1, fails AA), share-text variants (every brag identical → algorithm suppresses), screen-reader hostility (box-drawing + emoji as decoration), and the brag-card-without-a-back-link problem (PNG goes viral, no path back to the repo).
+
+P1 work shipped this round (all in one batch, no checkpoints):
+
+**Accessibility (P1, all five reviewers flagged):**
+- WCAG AA contrast fix: bumped `dim` from `#6c7086` (3.4:1) to `#9399b2` (~7:1, AAA). All text passes 4.5:1.
+- New `--plain` flag: strips ANSI, box-drawing, and emoji. Screen-reader friendly, CI-log friendly, SSH-without-unicode friendly. Threaded through every command (start, ship, status, history, abandon, screenshot, share).
+- New `--no-emoji` flag (+ `TWOWEEKS_NO_EMOJI=1` env): strip emoji while keeping colors. For terminals without emoji fonts.
+- `+`/`-` prefix on Saved / Cost line in result card so over-budget vs under-budget reads correctly under any color vision (was color-only).
+- `humanDurationSpoken()` added: outputs "47 minutes 12 seconds" instead of "47m 12s", exposed in `--json` output as `actual_spoken` for screen-reader piping.
+- UTF-16-safe task truncation via `[...string]` code-point spread (was breaking on surrogate-pair emoji in task names).
+- Sidecar `compression-<id>.alt.txt` written alongside every PNG screenshot — exact plain-text description users can paste into alt-text fields when sharing.
+- Format module accepts `CardOptions { plain, noEmoji }`; emoji are content (the 🎯 in milestones), not chrome — keep them unless explicitly opted out.
+
+**Viral mechanics (P1):**
+- 5 randomized share-text variants in `share.ts` (was 1). Algorithms downrank near-duplicate posts; rotating variants keeps each brag unique-feeling.
+- AI quote capture: `--quote "exact AI words"` flag at start time, included on the brag card and in one of the share-text variants. Receipts.
+- `--challenge @handle` flag: appends "@handle bet you can't top this" to share text. Sparks reply chains.
+- `--copy` flag on `ship --screenshot` and `screenshot` commands: macOS-only osascript pbcopy. PNG lands on the clipboard ready for Cmd+V into any compose box. Zero filesystem hop for a brag.
+- Brag-card footer stamp: `github.com/Meliwat/twoweeks · #<slug>` at the bottom of every PNG. The image can go viral disconnected from the post and people still find the repo. Slug is a SHA-256 prefix of the session — unforgeable, future-proofs verifiable receipts.
+
+**Trimming (P1, adoption-skeptic flagged):**
+- Flair: 25 → 10 messages, sharper. Removed "vibes-wise the AI is unbothered" type cute-but-meaningless lines. Kept the ones that punch.
+- Achievements: 13 → 7. Cut Estimation Slayer (the skeptic called it patronizing — "you didn't slay anything, the AI was guessing"), Time Bender, Centurion, Saved a Month / Year, Streak: 7 days. Kept: First Ship, Hat Trick, Marathon, 100x / 1000x / Million-x Clubs, Streak: 3 days.
+- Milestone copy softened: "Submit this to Nature." instead of "Time itself bent. Submit to Nature." Same joke, less try-hard.
+
+**Distribution + discoverability (P1, this round's headline):**
+- **Homebrew formula rewritten:** dropped the `oven-sh/bun/bun => :build` dep (that tap doesn't exist as a real Homebrew tap and the install was 404ing). Now `depends_on "node"` only and installs from prebuilt `dist/cli.js` via `npm install --production`. Shim script hardcodes the resolved node binary path. Test block uses `TWOWEEKS_HOME=testpath/.twoweeks` for isolation.
+- **`dist/cli.js` is now committed** (removed from `.gitignore`). Both `git clone && npm install && npm link` and Homebrew install paths get a working binary without needing Bun on the user's machine. Tradeoff: 52KB committed bundle, regenerated on `npm run build`. Acceptable for a CLI distribution artifact.
+- **`package.json` keywords expanded** for npm/GitHub discoverability: added `copilot`, `cursor`, `estimation`, `developer-tools`, `humor`, `brag`, `shipping`, `open-graph`, `screenshot`. Was 8 generic keywords; now 16 specific ones that index for the actual audience.
+- **GitHub repo topics** + description updated via `gh repo edit` to match (see "discoverability" section at end of this round).
+
+**Deferred (logged, not shipped):**
+- ed25519 signing of receipts + Cloudflare Worker / KV publish system at `twoweeks.dev/c/<slug>` — the "asymmetric sharing" feature the fifth reviewer surfaced. High-effort, requires Cloudflare credentials and a domain the user doesn't currently own. Slug stamp on every brag is the prerequisite (now shipped); the verify endpoint is a follow-up PR.
+- npm publish (`npm publish` to the registry). Tap install works, source install works; npm is a third path that requires the user to log in with `npm login` first.
+- Hand-recorded demo gif from a real session (current `assets/demo.gif` is the mechanical asciinema replay from Round 1). Visible in README but pre-launch the user should re-record with their own pacing.
+
+**Verification before tagging:**
+- 43 tests pass
+- Build emits 52.21 KB `dist/cli.js`
+- Smoke test: `node dist/cli.js "test" "2 weeks" && node dist/cli.js ship --json` returns ok=true with slug, ratio_formatted, actual_spoken
+- `--plain` mode strips emoji + box-drawing + colors, uses spoken durations
+- `--no-emoji` keeps colors but strips emoji
+- Help output shows v0.6.0
+
+**Discoverability (the explicit ask):**
+- GitHub repo description updated to lead with the one-liner the brag card sells
+- Topics added: `ai`, `claude`, `chatgpt`, `copilot`, `cursor`, `developer-tools`, `cli`, `productivity`, `time-tracking`, `estimation`, `humor`, `open-source` — what someone searching for "AI estimate" or "time tracking CLI" would actually type
+- Social preview PNG (`assets/social-preview.png`) was already generated in Round 3; still the right asset
+- README has badges (tests, license, runtime, stars) above the fold — signals "real project" at a glance
+
+Released as v0.6.0. Tag + GitHub Release + tap update + push, in one batch.

@@ -3,93 +3,92 @@
 [![test](https://img.shields.io/github/actions/workflow/status/Meliwat/twoweeks/test.yml?branch=main&style=flat-square&label=tests)](https://github.com/Meliwat/twoweeks/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/github/license/Meliwat/twoweeks?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/runtime-Node%2018%2B-339933?style=flat-square&logo=node.js)](https://nodejs.org)
-[![Bun](https://img.shields.io/badge/runtime-Bun-fbf0df?style=flat-square&logo=bun)](https://bun.sh)
 [![Stars](https://img.shields.io/github/stars/Meliwat/twoweeks?style=flat-square)](https://github.com/Meliwat/twoweeks/stargazers)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/Meliwat/twoweeks/issues)
 
 > Why your AI assistant always says two weeks but you ship by lunch.
 
-A CLI that times the gap between your AI's confident estimate and your actual ship time. Built for the era where "this is a multi-month project" turns into a single Friday afternoon.
+A tiny CLI that captures your AI's confident time estimate, times how long you actually took, and produces a brag card you can share. No accounts, no cloud, no telemetry — one local JSON file and one shareable PNG.
 
-![the brag card](assets/social-preview.png)
+## Quick start (30 seconds)
+
+```bash
+git clone https://github.com/Meliwat/twoweeks
+cd twoweeks
+npm install
+npm link
+
+# Now `twoweeks` is on your PATH.
+twoweeks "build the auth flow" "2 weeks"     # AI said this would take 2 weeks
+# ... go build ...
+twoweeks ship --screenshot                    # close the timer, save a PNG
+```
+
+That's it. A working CLI in under a minute.
+
+## What it does
+
+You ask an AI how long something will take. The AI confidently says "about 2 weeks of focused work." You ship it by lunch. `twoweeks` measures the gap and gives you a number you can share:
 
 ```
-# 1. AI says "build the auth flow"? About 2 weeks of focused work.
-# 2. You paste what it said into twoweeks. The estimate is its, not ours.
-
-$ twoweeks "build the auth flow" "2 weeks"
-⏰ 2 weeks remaining for: build the auth flow
-   Worst case, the AI is right. Best case, you ship.
-
-   (run `twoweeks ship` when you're done)
-
-# ... go build ...
-
-$ twoweeks ship --screenshot
-
 🎯 SHIPPED
 ──────────────────────────────────────────
 Task:        build the auth flow
 Estimated:   2 weeks
 Actual:      47m 12s
 Compression: 428x faster than the AI thought
-Saved:       13d 23h 12m
+Saved:       +13d 23h 12m
 ──────────────────────────────────────────
 
-🎯  Triple-digit compression. Your AI is recalibrating.
+🎯 Triple-digit compression. Your AI is recalibrating.
 
 📸 Screenshot: ~/.twoweeks/screenshots/compression-1.png
-
-Want to brag? Run: twoweeks share 1
 ```
+
+The PNG is 1200×630 (Open Graph dimensions) and ready to drop into a tweet.
+
+![sample brag card](assets/social-preview.png)
+
+## Why `"<eta>"` is required
+
+The whole joke is timing the gap between what the AI said and what actually happened. So **you have to tell `twoweeks` what the AI said.** There is no default of "2 weeks" — that would be the tool staging the joke instead of capturing it.
+
+```bash
+twoweeks "build the auth flow"   "2 weeks"
+twoweeks "ship the migration"    "3 months"
+twoweeks "fix the bug"           "5 hours"
+twoweeks "refactor the parser"   --eta "1 day"
+```
+
+The name `twoweeks` is the meme — what AIs always say. The tool measures whatever they actually said.
 
 ## Install
 
 ```bash
+# From source (works today on any machine with Node 18+):
+git clone https://github.com/Meliwat/twoweeks
+cd twoweeks && npm install && npm link
+
 # Homebrew (macOS / Linux):
 brew install Meliwat/twoweeks/twoweeks
-twoweeks "task"
 
-# When published to npm:
+# npm (coming soon):
 npm install -g twoweeks
-twoweeks "task"
-
-# or use without installing:
-npx twoweeks "task"
-
-# From source:
-git clone https://github.com/Meliwat/twoweeks
-cd twoweeks && bun install && bun link
 ```
 
-Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single local JSON file at `~/.twoweeks/history.json`. No cloud, no telemetry, no accounts.
-
-## Why `"<eta>"` is required
-
-The whole joke is timing the gap between what the AI said and what actually happens. So **you have to tell twoweeks what the AI said.** There's no default of "2 weeks" — that would be the tool inventing the joke instead of capturing it. Pass the AI's estimate as the second argument (or `--eta`):
-
-```bash
-twoweeks "build the auth flow" "2 weeks"
-twoweeks "ship the migration"  "3 months"
-twoweeks "fix the bug"         "5 hours"
-twoweeks "refactor the parser" --eta "1 day"
-```
-
-The name `twoweeks` is the meme — what AIs always say. The tool measures whatever they actually said.
+`npm link` puts a symlink to the CLI on your `$PATH`. If it doesn't, you can also run it directly as `node /path/to/twoweeks/dist/cli.js`.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `twoweeks "task" "<eta>"` | Start a timer for the task with the AI's stated estimate |
-| `twoweeks` | Show all active sessions and a status update from the AI |
-| `twoweeks status` | Same as bare command |
-| `twoweeks ship` | Close the most recent active session, print the brag card |
+| `twoweeks "task" "<eta>"` | Start a timer with the AI's stated estimate |
+| `twoweeks` | Show all active sessions and a status line |
+| `twoweeks ship` | Close the most recent session, print the brag card |
 | `twoweeks ship --share` | Ship and auto-open X with the brag pre-filled |
-| `twoweeks ship --screenshot` | Ship and save a **1200×630 PNG of the brag card** (Open Graph dimensions, ready to share) |
-| `twoweeks screenshot [id]` | Render a PNG for a shipped session (default: most recent) |
+| `twoweeks ship --screenshot` | Ship and save a 1200×630 PNG of the brag card |
+| `twoweeks screenshot [id]` | Render a PNG for a shipped session |
 | `twoweeks share [id]` | Open X with the brag for a shipped session |
-| `twoweeks history` | Shipped sessions + lifetime stats + **achievements** |
+| `twoweeks history` | Shipped sessions + lifetime stats + achievements |
 | `twoweeks abandon` | Abandon the current session (excluded from stats) |
 
 ## Flags
@@ -98,22 +97,27 @@ The name `twoweeks` is the meme — what AIs always say. The tool measures whate
 |---|---|
 | `--eta "3 months"` | Provide AI estimate via flag instead of positional |
 | `--force` | Start a new session even if one is already active |
-| `--to-bluesky` | Share to Bluesky instead of X |
-| `--to-mastodon` | Share to Mastodon instead of X |
+| `--to-bluesky` / `--to-mastodon` | Share to Bluesky / Mastodon instead of X |
 | `--print` | Print the share URL instead of opening the browser |
 | `--screenshot` | (on `ship`) Also save a PNG of the brag card |
-| `--out <path>` | Output path for `screenshot` command |
+| `--copy` | (on `ship --screenshot`) Copy the PNG to clipboard (macOS) |
+| `--out <path>` | Output path for the `screenshot` command |
 | `--open` | (on `screenshot`) Open the PNG after saving |
-| `--json` | Emit machine-readable JSON (every command). Pipe into `jq`. |
+| `--plain` | Plain-text output (no colors, no box drawing, no emoji) — screen-reader friendly |
 | `--no-color` | Disable ANSI colors (also respects `NO_COLOR=1`) |
+| `--no-emoji` | Strip emoji from output (also respects `TWOWEEKS_NO_EMOJI=1`) |
+| `--json` | Emit machine-readable JSON |
 | `--help, -h` | Show help |
 | `--version, -v` | Show version |
 
-## The brag card
+## Accessibility
 
-`twoweeks ship --screenshot` (or `twoweeks screenshot <id>`) renders a 1200×630 PNG of your compression result, sized exactly for Open Graph link previews. Drop it into a tweet, a Slack message, a presentation — it's designed to read as a self-contained brag.
-
-![sample brag card](assets/social-preview.png)
+- **`--plain`** strips ANSI colors, box-drawing characters, and emoji from output. Designed for screen readers, SSH-without-unicode, and CI logs.
+- **`--no-color`** (and `NO_COLOR=1`) disables colors only. Box-drawing and emoji remain.
+- **`--no-emoji`** strips emoji while keeping colors. Useful for terminals without an emoji font.
+- The result card uses `+`/`-` prefixes on the Saved / Cost line so over-budget vs under-budget reads correctly under any color vision.
+- Every shipped PNG also writes a sidecar `compression-<id>.alt.txt` with the same content in plain text, so screen-reader users can paste it as alt text when sharing.
+- `humanDurationSpoken` field in `--json` output gives "47 minutes 12 seconds" instead of "47m 12s" for screen-reader-friendly piping.
 
 ## Milestones
 
@@ -121,38 +125,33 @@ The name `twoweeks` is the meme — what AIs always say. The tool measures whate
 
 | Ratio | Milestone |
 |---|---|
-| ∞ (instant) | Time itself bent. Submit this to Nature. |
-| ≥ 1,000,000x | Million-x compression. Send screenshot to your AI's emergency contact. |
-| ≥ 100,000x | Six-figure compression. Your AI is in stage one of grief. |
-| ≥ 10,000x | Five-figure compression. The leaderboard called; you're on it. |
-| ≥ 1,000x | Four-figure compression. Frame this card. |
-| ≥ 100x | Triple-digit compression. Your AI is recalibrating. |
-| ≥ 10x | Double-digit compression. Solid Tuesday. |
-| ≥ 2x | Faster than estimated. The AI quietly updates its priors. |
-| ≥ 1x | Within a hair of the estimate. The AI feels seen. |
-| ≥ 0.5x | Slower than estimated, but not by much. The AI was almost right. |
-| < 0.5x | Significantly slower. The AI was, against all odds, correct. |
+| ∞ (instant) | Submit this to Nature. |
+| ≥ 1,000,000x | Million-x compression. Frame it. |
+| ≥ 100,000x | Six-figure compression. The AI is recalibrating. |
+| ≥ 10,000x | Five-figure compression. Solid Tuesday. |
+| ≥ 1,000x | Four-figure compression. |
+| ≥ 100x | Triple-digit compression. |
+| ≥ 10x | Double-digit compression. |
+| ≥ 1x | Within a hair of the estimate. |
+| < 1x | The AI was, against all odds, correct. |
 
 ## Achievements
 
-`twoweeks history` tracks 13 achievements with progress bars:
+`twoweeks history` tracks 7 achievements:
 
-- **First Ship** / **Hat Trick** / **Marathon** / **Centurion** (1, 3, 10, 100 ships)
+- **First Ship** / **Hat Trick** / **Marathon** (1, 3, 10 ships)
 - **100x Club** / **1000x Club** / **Million-x Club** (compression milestones)
-- **Time Bender** (any instant ship)
-- **Estimation Slayer** (5 honest over-budget ships)
-- **Streak: 3 days** / **Streak: 7 days** (consecutive shipping days)
-- **Saved a Month** / **Saved a Year** (cumulative AI-time saved)
+- **Streak: 3 days** (consecutive shipping days)
 
 ## How it works
 
-Every session gets stamped with an ETA (default: 2 weeks). When you ship, `twoweeks` computes the compression ratio:
+Every session gets stamped with the AI's stated ETA. When you ship, `twoweeks` computes:
 
 ```
 ratio = eta_ms / actual_ms
 ```
 
-A 2-week estimate shipped in 47 minutes is ~428x compression. The CLI then offers to open X (or Bluesky, or Mastodon) with a pre-filled brag, or generate a sharable PNG.
+A 2-week estimate shipped in 47 minutes is ~428x compression. The CLI then offers to open X (or Bluesky, or Mastodon) with a pre-filled brag, generate a shareable PNG, or both.
 
 ## Scripting
 
@@ -162,8 +161,8 @@ Every command supports `--json` for piping:
 $ twoweeks ship --json | jq '.ratio_formatted'
 "428x"
 
-$ twoweeks history --json | jq '.achievements[] | select(.earned)'
-{ "id": "first_ship", "name": "First Ship", ... }
+$ twoweeks history --json | jq '.stats.bestRatio'
+1247.34
 
 $ twoweeks --json | jq '.active[].task'
 "build the auth flow"
@@ -171,15 +170,29 @@ $ twoweeks --json | jq '.active[].task'
 
 ## Storage
 
-Local JSON at `~/.twoweeks/history.json`. PNG brag cards at `~/.twoweeks/screenshots/`. No cloud. No accounts. No telemetry. Override with `TWOWEEKS_HOME=/somewhere/else`.
+Local JSON at `~/.twoweeks/history.json`. PNG brag cards at `~/.twoweeks/screenshots/`. No cloud, no accounts, no telemetry. Override with `TWOWEEKS_HOME=/somewhere/else`.
+
+## Troubleshooting
+
+**`twoweeks: command not found`** — `npm link` couldn't add the binary to your PATH. Either fix that (run `npm link` again, check `$(npm prefix -g)/bin` is in PATH), or run the CLI directly: `node $(pwd)/dist/cli.js`.
+
+**`Error: missing AI estimate`** — Pass the AI's estimate as the second argument: `twoweeks "task" "2 weeks"`. There's no default; the joke is capturing what the AI said.
+
+**Box-drawing characters render as `?` or boxes** — Your terminal lacks Unicode support. Use `--plain` to get ASCII output.
+
+**Emoji render as boxes** — Your terminal lacks an emoji font. Use `--no-emoji` or set `TWOWEEKS_NO_EMOJI=1`.
+
+**`brew install` fails** — Make sure you ran `brew tap Meliwat/twoweeks` first, or use the full form: `brew install Meliwat/twoweeks/twoweeks`.
+
+**Want to wipe your history?** — `rm -rf ~/.twoweeks` or delete just `~/.twoweeks/history.json`.
 
 ## Development
 
 ```bash
-bun install            # install dev dependencies
-bun run cli "task"     # run from source
-bun test               # run the test suite (39 tests)
-bun run build          # build dist/cli.js
+bun install            # install dev dependencies (Bun preferred for fast tests)
+bun run cli "task" "2 weeks"
+bun test               # run the test suite (43 tests)
+bun run build          # build dist/cli.js (Node-compatible bundle)
 ```
 
 ## License

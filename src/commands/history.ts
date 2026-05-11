@@ -1,11 +1,13 @@
 import { getAllShipped, getStats } from "../db.ts";
-import { computeRatio, historyTable, formatRatio, humanDuration } from "../format.ts";
+import { computeRatio, historyTable, formatRatio, humanDuration, humanDurationSpoken } from "../format.ts";
 import { computeAchievements } from "../achievements.ts";
 import type { Session } from "../db.ts";
 import { c } from "../colors.ts";
 
 export interface HistoryArgs {
   json?: boolean;
+  plain?: boolean;
+  noEmoji?: boolean;
 }
 
 export function history(args: HistoryArgs = {}): number {
@@ -30,6 +32,7 @@ export function history(args: HistoryArgs = {}): number {
           bestRatio,
           avgRatio,
           totalSavedHuman: humanDuration(stats.totalSavedMs),
+          totalSavedSpoken: humanDurationSpoken(stats.totalSavedMs),
         },
         achievements,
         shipped: shippedSessions.map((s, i) => ({
@@ -48,11 +51,11 @@ export function history(args: HistoryArgs = {}): number {
   }));
 
   console.log(
-    historyTable(rows, {
-      ...stats,
-      bestRatio,
-      avgRatio,
-    })
+    historyTable(
+      rows,
+      { ...stats, bestRatio, avgRatio },
+      { plain: args.plain, noEmoji: args.noEmoji }
+    )
   );
 
   // Achievements section
@@ -65,7 +68,28 @@ export function history(args: HistoryArgs = {}): number {
     return 0;
   }
 
-  console.log(c.brightYellow(c.bold("🏆 ACHIEVEMENTS")));
+  if (args.plain) {
+    console.log("Achievements:");
+    if (earned.length === 0) {
+      console.log("  Ship your first session to start earning these.");
+    } else {
+      for (const a of earned) {
+        console.log(`  [x] ${a.name}: ${a.description}`);
+      }
+    }
+    if (inProgress.length > 0) {
+      console.log("\n  In progress:");
+      for (const a of inProgress) {
+        const pct = a.goal && a.progress !== undefined ? `${a.progress}/${a.goal}` : "";
+        console.log(`  [ ] ${a.name} (${pct})`);
+      }
+    }
+    console.log("");
+    return 0;
+  }
+
+  const trophy = args.noEmoji ? "" : "🏆 ";
+  console.log(c.brightYellow(c.bold(`${trophy}ACHIEVEMENTS`)));
   console.log(c.dim("─".repeat(74)));
   if (earned.length === 0) {
     console.log("  " + c.dim("Ship your first session to start earning these."));

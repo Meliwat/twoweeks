@@ -18,6 +18,8 @@ export interface Session {
   started_at: number;
   shipped_at: number | null;
   abandoned: number;
+  /** Verbatim AI quote (optional). Captured for future card rendering + share text. */
+  quote?: string;
 }
 
 interface Store {
@@ -47,7 +49,12 @@ function save(store: Store): void {
   writeFileSync(dbPath(), JSON.stringify(store, null, 2));
 }
 
-export function createSession(task: string, etaText: string, etaMs: number): Session {
+export function createSession(
+  task: string,
+  etaText: string,
+  etaMs: number,
+  quote?: string
+): Session {
   const store = load();
   const session: Session = {
     id: store.next_id,
@@ -57,6 +64,7 @@ export function createSession(task: string, etaText: string, etaMs: number): Ses
     started_at: Date.now(),
     shipped_at: null,
     abandoned: 0,
+    ...(quote ? { quote } : {}),
   };
   store.sessions.push(session);
   store.next_id++;

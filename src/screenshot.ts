@@ -2,19 +2,14 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { createHash } from "node:crypto";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 import type { Session } from "./db.ts";
-import { computeRatio, formatRatio, humanDuration } from "./format.ts";
+import { computeRatio, formatRatio, humanDuration, humanDurationSpoken } from "./format.ts";
 import { milestoneFor } from "./flair.ts";
 
-// Bun and Node both support import.meta.dir / import.meta.url. Build artifact
-// inlines path; in dev we resolve relative to source.
 function fontsDir(): string {
-  // Bun-style: import.meta.dir works in both bun runtime and bun-built bundles.
-  // Fallback for Node: derive from import.meta.url.
-  // The dist bundle inlines the file contents at build time via the loadFonts()
-  // function below using readFileSync with embedded paths.
   try {
     // @ts-ignore - bun specific
     if (typeof import.meta.dir === "string") return join(import.meta.dir, "..", "assets", "fonts");
@@ -23,8 +18,6 @@ function fontsDir(): string {
 }
 
 function loadFonts() {
-  // Try common locations for the fonts. In dev: ./assets/fonts. In a packaged
-  // install: alongside the bundle.
   const candidates = [
     fontsDir(),
     join(process.cwd(), "assets", "fonts"),
@@ -48,13 +41,14 @@ function loadFonts() {
   );
 }
 
-// Catppuccin Mocha palette
+// Catppuccin Mocha palette, with `dim` bumped from #6c7086 (3.4:1) to overlay2
+// (#9399b2, ~7:1) so labels pass WCAG AA contrast against the bg.
 const COLORS = {
   bg: "#1e1e2e",
   surface: "#313244",
   text: "#cdd6f4",
   subtext: "#a6adc8",
-  dim: "#6c7086",
+  dim: "#9399b2",
   green: "#a6e3a1",
   brightGreen: "#94e2d5",
   yellow: "#f9e2af",
@@ -71,15 +65,14 @@ interface CardContext {
   ratio: number;
   ratioText: string;
   milestone?: string;
+  slug?: string;
 }
 
 function truncate(s: string, n = 48): string {
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+  const chars = [...s];
+  return chars.length > n ? chars.slice(0, n - 1).join("") + "…" : s;
 }
 
-// Strip leading emoji from text. JetBrains Mono has no emoji table; emoji glyphs
-// render as boxes in satori output. We keep emoji in CLI output (terminals handle
-// it natively) but remove them from PNG cards.
 function stripEmoji(s: string): string {
   return s
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{1F100}-\u{1F1FF}]/gu, "")
@@ -94,11 +87,20 @@ function brandStyle(ratio: number): string {
   return COLORS.red;
 }
 
+// Short deterministic slug from a session for the footer stamp. NOT a security
+// primitive; just helps a viewer correlate a screenshot with the user's CLI run.
+export function sessionSlug(session: Session): string {
+  const seed = `${session.id}|${session.task}|${session.started_at}|${session.shipped_at ?? 0}`;
+  const h = createHash("sha256").update(seed).digest("hex");
+  return h.slice(0, 6);
+}
+
 function cardTree(ctx: CardContext) {
   const ratioColor = brandStyle(ctx.ratio);
   const overBudget = ctx.ratio < 1;
   const savedMs = overBudget ? ctx.actualMs - ctx.etaMs : ctx.etaMs - ctx.actualMs;
   const savedLabel = overBudget ? "Cost" : "Saved";
+  const savedSign = overBudget ? "−" : "+";
 
   return {
     type: "div",
@@ -115,7 +117,7 @@ function cardTree(ctx: CardContext) {
         position: "relative",
       },
       children: [
-        // header
+        // header row
         {
           type: "div",
           props: {
@@ -124,14 +126,14 @@ function cardTree(ctx: CardContext) {
               {
                 type: "div",
                 props: {
-                  style: { color: COLORS.dim, fontSize: "26px", fontWeight: 400 },
+                  style: { color: COLORS.subtext, fontSize: "26px", fontWeight: 400 },
                   children: "twoweeks",
                 },
               },
               {
                 type: "div",
                 props: {
-                  style: { color: COLORS.dim, fontSize: "20px", fontWeight: 400, letterSpacing: "3px" },
+                  style: { color: COLORS.subtext, fontSize: "20px", fontWeight: 400, letterSpacing: "3px" },
                   children: "SHIPPED",
                 },
               },
@@ -147,8 +149,8 @@ function cardTree(ctx: CardContext) {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              marginTop: "32px",
-              marginBottom: "32px",
+              marginTop: "28px",
+              marginBottom: "28px",
             },
             children: [
               {
@@ -187,7 +189,7 @@ function cardTree(ctx: CardContext) {
               height: "1px",
               backgroundColor: COLORS.surface,
               width: "100%",
-              marginBottom: "28px",
+              marginBottom: "24px",
             },
           },
         },
@@ -197,20 +199,20 @@ function cardTree(ctx: CardContext) {
           props: {
             style: { display: "flex", justifyContent: "space-between", gap: "32px" },
             children: [
-              statBlock("Task", truncate(ctx.task, 36), COLORS.text, false),
-              statBlock("Estimated", ctx.etaText, COLORS.subtext, false),
-              statBlock("Actual", humanDuration(ctx.actualMs), COLORS.yellow, false),
-              statBlock(savedLabel, humanDuration(savedMs), overBudget ? COLORS.red : COLORS.green, false),
+              statBlock("Task", truncate(ctx.task, 36), COLORS.text),
+              statBlock("Estimated", ctx.etaText, COLORS.subtext),
+              statBlock("Actual", humanDuration(ctx.actualMs), COLORS.yellow),
+              statBlock(savedLabel, `${savedSign}${humanDuration(savedMs)}`, overBudget ? COLORS.red : COLORS.green),
             ],
           },
         },
-        // milestone footer
+        // milestone
         ctx.milestone
           ? {
               type: "div",
               props: {
                 style: {
-                  marginTop: "36px",
+                  marginTop: "28px",
                   color: COLORS.yellow,
                   fontSize: "22px",
                   fontWeight: 700,
@@ -221,12 +223,40 @@ function cardTree(ctx: CardContext) {
               },
             }
           : { type: "div", props: { children: "" } },
+        // footer stamp (github URL + slug) so retweeted screenshots still point home
+        {
+          type: "div",
+          props: {
+            style: {
+              marginTop: "auto",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              color: COLORS.dim,
+              fontSize: "16px",
+              fontWeight: 400,
+            },
+            children: [
+              {
+                type: "div",
+                props: { children: "github.com/Meliwat/twoweeks" },
+              },
+              {
+                type: "div",
+                props: {
+                  style: { letterSpacing: "1px" },
+                  children: ctx.slug ? `#${ctx.slug}` : "",
+                },
+              },
+            ],
+          },
+        },
       ],
     },
   };
 }
 
-function statBlock(label: string, value: string, valueColor: string, _bold: boolean) {
+function statBlock(label: string, value: string, valueColor: string) {
   return {
     type: "div",
     props: {
@@ -235,7 +265,7 @@ function statBlock(label: string, value: string, valueColor: string, _bold: bool
         {
           type: "div",
           props: {
-            style: { fontSize: "16px", color: COLORS.dim, marginBottom: "6px", letterSpacing: "1px" },
+            style: { fontSize: "16px", color: COLORS.subtext, marginBottom: "6px", letterSpacing: "1px" },
             children: label.toUpperCase(),
           },
         },
@@ -274,12 +304,11 @@ export async function renderShipCard(session: Session): Promise<Uint8Array> {
     ratio,
     ratioText: formatRatio(ratio),
     milestone: milestoneFor(ratio),
+    slug: sessionSlug(session),
   });
 }
 
 export async function renderSocialPreview(): Promise<Uint8Array> {
-  // Evergreen card for GitHub social preview / og:image. Uses a sample
-  // dramatic-but-plausible ratio.
   const sampleRatio = 425;
   return renderCard({
     task: "build the auth flow",
@@ -300,8 +329,34 @@ export function defaultScreenshotPath(sessionId: number): string {
   return join(dir, `compression-${sessionId}.png`);
 }
 
+export function altTextPath(pngPath: string): string {
+  return pngPath.replace(/\.png$/i, ".alt.txt");
+}
+
+/** Plain-text alt text for the PNG. Written as a sibling so screen-reader users
+ *  who share the brag have something to paste as alt. */
+export function altTextForSession(session: Session): string {
+  if (session.shipped_at === null) return "";
+  const actualMs = session.shipped_at - session.started_at;
+  const ratio = computeRatio(session);
+  const overBudget = ratio < 1;
+  const verdict = overBudget ? "slower" : "faster";
+  return [
+    `twoweeks brag card.`,
+    `Task: ${session.task}.`,
+    `The AI estimated ${session.eta_text}.`,
+    `Actually shipped in ${humanDurationSpoken(actualMs)}.`,
+    `That is ${formatRatio(ratio)} ${verdict} than the AI estimated.`,
+    `Source: github.com/Meliwat/twoweeks`,
+  ].join(" ");
+}
+
 export function writeScreenshot(path: string, png: Uint8Array): void {
   const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(path, png);
+}
+
+export function writeAltText(pngPath: string, altText: string): void {
+  writeFileSync(altTextPath(pngPath), altText + "\n");
 }

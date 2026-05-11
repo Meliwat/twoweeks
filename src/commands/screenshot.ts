@@ -1,5 +1,12 @@
 import { getSessionById, getMostRecentShipped } from "../db.ts";
-import { renderShipCard, defaultScreenshotPath, writeScreenshot } from "../screenshot.ts";
+import {
+  renderShipCard,
+  defaultScreenshotPath,
+  writeScreenshot,
+  writeAltText,
+  altTextForSession,
+  altTextPath,
+} from "../screenshot.ts";
 import { c } from "../colors.ts";
 import { spawn } from "node:child_process";
 import { platform } from "node:os";
@@ -9,7 +16,23 @@ export interface ScreenshotArgs {
   id?: number;
   out?: string;
   open?: boolean;
+  copy?: boolean;
+  plain?: boolean;
   json?: boolean;
+}
+
+function pbcopyPng(path: string): boolean {
+  if (platform() !== "darwin") return false;
+  try {
+    const proc = spawn(
+      "osascript",
+      ["-e", `set the clipboard to (read (POSIX file "${path}") as «class PNGf»)`],
+      { stdio: "ignore" }
+    );
+    return proc.pid !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 export async function screenshotCmd(args: ScreenshotArgs): Promise<number> {
@@ -19,7 +42,7 @@ export async function screenshotCmd(args: ScreenshotArgs): Promise<number> {
     if (args.json) {
       console.error(JSON.stringify({ ok: false, error: "no_shipped_session" }));
     } else {
-      console.error(c.brightRed("Error:") + " no shipped session. Ship one first.");
+      console.error((args.plain ? "Error: " : c.brightRed("Error:") + " ") + "no shipped session. Ship one first.");
     }
     return 1;
   }
@@ -27,7 +50,8 @@ export async function screenshotCmd(args: ScreenshotArgs): Promise<number> {
     if (args.json) {
       console.error(JSON.stringify({ ok: false, error: "session_not_shipped", id: session.id }));
     } else {
-      console.error(c.brightRed("Error:") + ` session ${session.id} hasn't shipped yet.`);
+      const msg = `session ${session.id} hasn't shipped yet.`;
+      console.error((args.plain ? "Error: " : c.brightRed("Error:") + " ") + msg);
     }
     return 1;
   }
@@ -40,20 +64,41 @@ export async function screenshotCmd(args: ScreenshotArgs): Promise<number> {
     if (args.json) {
       console.error(JSON.stringify({ ok: false, error: "render_failed", details: msg }));
     } else {
-      console.error(c.brightRed("Error:") + " failed to render screenshot: " + msg);
+      console.error((args.plain ? "Error: " : c.brightRed("Error:") + " ") + "failed to render screenshot: " + msg);
     }
     return 1;
   }
 
   const outPath = args.out ? resolve(args.out) : defaultScreenshotPath(session.id);
   writeScreenshot(outPath, png);
+  const altPath = altTextPath(outPath);
+  writeAltText(outPath, altTextForSession(session));
+
+  let copied = false;
+  if (args.copy) {
+    copied = pbcopyPng(outPath);
+  }
 
   if (args.json) {
-    console.log(JSON.stringify({ ok: true, path: outPath, session_id: session.id, bytes: png.length }));
+    console.log(JSON.stringify({
+      ok: true,
+      path: outPath,
+      alt_text_path: altPath,
+      session_id: session.id,
+      bytes: png.length,
+      copied_to_clipboard: copied,
+    }));
+  } else if (args.plain) {
+    console.log(`Screenshot saved: ${outPath}`);
+    console.log(`Alt text:        ${altPath}`);
+    console.log(`${png.length} bytes, 1200x630 (Open Graph dimensions).`);
+    if (copied) console.log("PNG copied to clipboard.");
   } else {
     console.log("");
     console.log(c.dim("Screenshot saved: ") + c.bold(outPath));
+    console.log(c.dim("Alt text:        ") + c.dim(altPath));
     console.log(c.dim(`${png.length} bytes, 1200x630 (Open Graph dimensions).`));
+    if (copied) console.log(c.brightGreen("✓ PNG copied to clipboard — Cmd+V into any compose box."));
     console.log("");
   }
 
