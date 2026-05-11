@@ -1,6 +1,6 @@
 {
   "name": "twoweeks",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Why your AI assistant always says two weeks but you ship by lunch.",
   "author": "meliwat",
   "license": "MIT",
@@ -11,7 +11,8 @@
   "scripts": {
     "cli": "bun run src/cli.ts",
     "build": "bun build src/cli.ts --target=bun --outfile=dist/cli.js && chmod +x dist/cli.js",
-    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "prepublishOnly": "bun run build && bun test",
     "start": "bun run src/cli.ts"
   },
   "engines": {
@@ -30,8 +31,17 @@
     "cli",
     "joke",
     "productivity",
-    "bun"
+    "bun",
+    "time-tracker"
   ],
+  "homepage": "https://github.com/Meliwat/twoweeks",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Meliwat/twoweeks.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Meliwat/twoweeks/issues"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

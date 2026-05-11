@@ -3,7 +3,8 @@ import { mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const DB_DIR = join(homedir(), ".twoweeks");
+const DB_DIR_OVERRIDE = process.env.TWOWEEKS_HOME;
+const DB_DIR = DB_DIR_OVERRIDE ?? join(homedir(), ".twoweeks");
 const DB_PATH = join(DB_DIR, "history.db");
 
 if (!existsSync(DB_DIR)) {
@@ -85,4 +86,40 @@ export function getMostRecentShipped(): Session | null {
       "SELECT * FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0 ORDER BY shipped_at DESC LIMIT 1"
     )
     .get() as Session | null) ?? null;
+}
+
+export function getAllShipped(): Session[] {
+  return db
+    .query(
+      "SELECT * FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0 ORDER BY shipped_at DESC"
+    )
+    .all() as Session[];
+}
+
+export function getStats(): {
+  total: number;
+  shipped: number;
+  abandoned: number;
+  totalSavedMs: number;
+} {
+  const totalRow = db
+    .query("SELECT COUNT(*) as n FROM sessions")
+    .get() as { n: number };
+  const shippedRow = db
+    .query("SELECT COUNT(*) as n FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0")
+    .get() as { n: number };
+  const abandonedRow = db
+    .query("SELECT COUNT(*) as n FROM sessions WHERE abandoned = 1")
+    .get() as { n: number };
+  const savedRow = db
+    .query(
+      "SELECT SUM(eta_ms - (shipped_at - started_at)) as ms FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0 AND (shipped_at - started_at) < eta_ms"
+    )
+    .get() as { ms: number | null };
+  return {
+    total: totalRow.n,
+    shipped: shippedRow.n,
+    abandoned: abandonedRow.n,
+    totalSavedMs: savedRow.ms ?? 0,
+  };
 }

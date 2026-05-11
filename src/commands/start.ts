@@ -1,6 +1,8 @@
 import { createSession, getMostRecentActive } from "../db.ts";
 import { parseEta, DEFAULT_ETA_TEXT, DEFAULT_ETA_MS } from "../eta.ts";
 import { randomFlair } from "../flair.ts";
+import { startCard } from "../format.ts";
+import { c } from "../colors.ts";
 
 export interface StartArgs {
   task: string;
@@ -9,18 +11,18 @@ export interface StartArgs {
 }
 
 export function start(args: StartArgs): number {
-  if (!args.task) {
-    console.error('Error: task is required. Try: twoweeks "build the auth flow"');
+  if (!args.task || args.task.trim().length === 0) {
+    console.error(c.brightRed('Error:') + ' task is required. Try: twoweeks "build the auth flow"');
     return 1;
   }
 
   const active = getMostRecentActive();
   if (active && !args.force) {
     console.log("");
-    console.log(`⚠️  You already have an active session: "${active.task}"`);
-    console.log(`   Started ${new Date(active.started_at).toLocaleString()}.`);
+    console.log(`${c.brightYellow("⚠️")}  You already have an active session: ${c.bold(active.task)}`);
+    console.log(`   ${c.dim("Started " + new Date(active.started_at).toLocaleString() + ".")}`);
     console.log("");
-    console.log("Ship or abandon it first, or rerun with --force to start a new one in parallel.");
+    console.log(c.dim("Ship or abandon it first, or rerun with ") + c.bold("--force") + c.dim(" to start a new one in parallel."));
     console.log("");
     return 2;
   }
@@ -30,20 +32,14 @@ export function start(args: StartArgs): number {
     try {
       eta = parseEta(args.eta);
     } catch (err) {
-      console.error((err as Error).message);
+      console.error(c.brightRed("Error:") + " " + (err as Error).message);
       return 1;
     }
   } else {
     eta = { text: DEFAULT_ETA_TEXT, ms: DEFAULT_ETA_MS };
   }
 
-  const session = createSession(args.task, eta.text, eta.ms);
-
-  console.log("");
-  console.log(`⏰ ${eta.text} remaining for: ${session.task}`);
-  console.log(`   ${randomFlair()}`);
-  console.log("");
-  console.log(`   (run \`twoweeks ship\` when you're done)`);
-  console.log("");
+  const session = createSession(args.task.trim(), eta.text, eta.ms);
+  console.log(startCard(session, randomFlair()));
   return 0;
 }

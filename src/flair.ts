@@ -1,4 +1,4 @@
-const MESSAGES = [
+const STATUS_MESSAGES = [
   "Your AI is sure of it.",
   "Plenty of time.",
   "The estimate stands.",
@@ -14,11 +14,49 @@ const MESSAGES = [
   "Patience. Your AI did the math.",
   "The estimate is firm. The AI insists.",
   "The AI is calm.",
-  "Trust the system. The system is the AI.",
-  "Day 0.005: your AI assistant remains confident.",
+  "Day 5: your AI assistant has not been notified of recent developments.",
   "The AI is committed to this timeline.",
+  "The AI did not factor in the existence of itself.",
+  "Vibes-wise, the AI is unbothered.",
+  "The AI has high conviction. Source: trust.",
+  "The model card did not mention this scenario.",
+  "Plenty of token budget for the wait.",
+  "Worst case, the AI is right. Best case, you ship.",
+  "The AI's training data did not include your laptop.",
+  "Estimation is a hard problem. The AI nods regardless.",
 ];
 
 export function randomFlair(): string {
-  return MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+  return STATUS_MESSAGES[Math.floor(Math.random() * STATUS_MESSAGES.length)];
+}
+
+export function milestoneFor(ratio: number): string | undefined {
+  if (!isFinite(ratio)) {
+    return "🌌  Time itself bent. Submit this to Nature.";
+  }
+  if (ratio >= 1_000_000) {
+    return "💥  Million-x compression. Send screenshot to your AI's emergency contact.";
+  }
+  if (ratio >= 100_000) {
+    return "🔥  Six-figure compression. Your AI is in stage one of grief.";
+  }
+  if (ratio >= 10_000) {
+    return "🚀  Five-figure compression. The leaderboard called; you're on it.";
+  }
+  if (ratio >= 1_000) {
+    return "✨  Four-figure compression. Frame this card.";
+  }
+  if (ratio >= 100) {
+    return "🎯  Triple-digit compression. Your AI is recalibrating.";
+  }
+  if (ratio >= 10) {
+    return "👍  Double-digit compression. Solid Tuesday.";
+  }
+  if (ratio >= 2) {
+    return "📈  Faster than estimated. The AI quietly updates its priors.";
+  }
+  if (ratio >= 1) {
+    return "🤝  Exactly on time. The AI feels seen.";
+  }
+  return "🐢  Slower than estimated. The AI was, against all odds, right.";
 }
