@@ -144,9 +144,12 @@ export async function ship(args: ShipArgs): Promise<number> {
       console.log("");
     }
     openUrl(url);
-  } else if (!args.plain) {
-    console.log(c.dim("Want to brag? Run: ") + c.bold(`twoweeks share ${shipped.id}`));
-    console.log(c.dim("Or save a PNG:    ") + c.bold(`twoweeks ship --screenshot`));
+  } else if (args.plain) {
+    console.log(`Tweet it:   twoweeks share ${shipped.id}`);
+    console.log(`Save PNG:   twoweeks ship --screenshot --copy`);
+  } else {
+    console.log(c.brightCyan("→ Tweet it:") + " " + c.bold(`twoweeks share ${shipped.id}`));
+    console.log(c.dim("  Save PNG:  ") + c.bold(`twoweeks ship --screenshot --copy`));
     console.log("");
   }
   return 0;

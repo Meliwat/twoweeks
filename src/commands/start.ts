@@ -14,17 +14,15 @@ export interface StartArgs {
   json?: boolean;
 }
 
-const MISSING_ETA_HELP = `twoweeks needs your AI's estimate. The whole joke is timing the gap
-between what the AI said and what actually happens — so you have to tell it
-what the AI said.
-
-Pass the estimate as the second argument or via --eta:
+const MISSING_ETA_HELP = `Pass the AI's estimate as the second argument or via --eta:
 
   twoweeks "build the auth flow" "2 weeks"
   twoweeks "build the auth flow" "3 months"
   twoweeks "build the auth flow" --eta "5 hours"
 
-Accepts: minute(s), hour(s), day(s), week(s), month(s).`;
+Accepts: minute(s), hour(s), day(s), week(s), month(s).
+
+Tip: run \`twoweeks install-hook\` to auto-capture estimates from Claude Code.`;
 
 export function start(args: StartArgs): number {
   if (!args.task || args.task.trim().length === 0) {
