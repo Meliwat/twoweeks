@@ -1,5 +1,5 @@
 import { createSession, getMostRecentActive } from "../db.ts";
-import { parseEta, DEFAULT_ETA_TEXT, DEFAULT_ETA_MS } from "../eta.ts";
+import { parseEta } from "../eta.ts";
 import { randomFlair } from "../flair.ts";
 import { startCard } from "../format.ts";
 import { c } from "../colors.ts";
@@ -11,12 +11,37 @@ export interface StartArgs {
   json?: boolean;
 }
 
+const MISSING_ETA_HELP = `twoweeks needs your AI's estimate. The whole joke is timing the gap
+between what the AI said and what actually happens — so you have to tell it
+what the AI said.
+
+Pass the estimate as the second argument or via --eta:
+
+  twoweeks "build the auth flow" "2 weeks"
+  twoweeks "build the auth flow" "3 months"
+  twoweeks "build the auth flow" --eta "5 hours"
+
+Accepts: minute(s), hour(s), day(s), week(s), month(s).`;
+
 export function start(args: StartArgs): number {
   if (!args.task || args.task.trim().length === 0) {
     if (args.json) {
       console.error(JSON.stringify({ ok: false, error: "task is required" }));
     } else {
-      console.error(c.brightRed("Error:") + ' task is required. Try: twoweeks "build the auth flow"');
+      console.error(c.brightRed("Error:") + ' task is required. Try: twoweeks "build the auth flow" "2 weeks"');
+    }
+    return 1;
+  }
+
+  if (!args.eta) {
+    if (args.json) {
+      console.error(JSON.stringify({ ok: false, error: "eta_required", hint: "twoweeks needs the AI's estimate; pass it as the second arg or via --eta" }));
+    } else {
+      console.error("");
+      console.error(c.brightRed("Error: missing AI estimate."));
+      console.error("");
+      console.error(MISSING_ETA_HELP);
+      console.error("");
     }
     return 1;
   }
@@ -44,20 +69,16 @@ export function start(args: StartArgs): number {
   }
 
   let eta: { text: string; ms: number };
-  if (args.eta) {
-    try {
-      eta = parseEta(args.eta);
-    } catch (err) {
-      const msg = (err as Error).message;
-      if (args.json) {
-        console.error(JSON.stringify({ ok: false, error: msg }));
-      } else {
-        console.error(c.brightRed("Error:") + " " + msg);
-      }
-      return 1;
+  try {
+    eta = parseEta(args.eta);
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (args.json) {
+      console.error(JSON.stringify({ ok: false, error: msg }));
+    } else {
+      console.error(c.brightRed("Error:") + " " + msg);
     }
-  } else {
-    eta = { text: DEFAULT_ETA_TEXT, ms: DEFAULT_ETA_MS };
+    return 1;
   }
 
   const session = createSession(args.task.trim(), eta.text, eta.ms);

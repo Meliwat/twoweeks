@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { parseEta, DEFAULT_ETA_MS, DEFAULT_ETA_TEXT } from "../src/eta.ts";
+import { parseEta, SAMPLE_ETA_MS, SAMPLE_ETA_TEXT } from "../src/eta.ts";
 
 describe("parseEta", () => {
   test("parses '2 weeks'", () => {
@@ -47,8 +47,8 @@ describe("parseEta", () => {
     expect(() => parseEta("weeks")).toThrow();
   });
 
-  test("DEFAULT_ETA_MS is 2 weeks", () => {
-    expect(DEFAULT_ETA_MS).toBe(14 * 24 * 60 * 60 * 1000);
-    expect(DEFAULT_ETA_TEXT).toBe("2 weeks");
+  test("SAMPLE_ETA_MS is 2 weeks (used only for social-preview generator)", () => {
+    expect(SAMPLE_ETA_MS).toBe(14 * 24 * 60 * 60 * 1000);
+    expect(SAMPLE_ETA_TEXT).toBe("2 weeks");
   });
 });

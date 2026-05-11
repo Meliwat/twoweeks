@@ -2,12 +2,12 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const DB_DIR_OVERRIDE = process.env.TWOWEEKS_HOME;
-const DB_DIR = DB_DIR_OVERRIDE ?? join(homedir(), ".twoweeks");
-const DB_PATH = join(DB_DIR, "history.json");
-
-if (!existsSync(DB_DIR)) {
-  mkdirSync(DB_DIR, { recursive: true });
+// Resolve storage path on every call (rather than at module load) so test
+// suites that swap TWOWEEKS_HOME mid-process get isolation.
+function dbPath(): string {
+  const dir = process.env.TWOWEEKS_HOME ?? join(homedir(), ".twoweeks");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return join(dir, "history.json");
 }
 
 export interface Session {
@@ -27,11 +27,12 @@ interface Store {
 }
 
 function load(): Store {
-  if (!existsSync(DB_PATH)) {
+  const path = dbPath();
+  if (!existsSync(path)) {
     return { version: 1, next_id: 1, sessions: [] };
   }
   try {
-    const raw = readFileSync(DB_PATH, "utf-8");
+    const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(raw) as Store;
     if (!parsed.sessions || typeof parsed.next_id !== "number") {
       return { version: 1, next_id: 1, sessions: [] };
@@ -43,7 +44,7 @@ function load(): Store {
 }
 
 function save(store: Store): void {
-  writeFileSync(DB_PATH, JSON.stringify(store, null, 2));
+  writeFileSync(dbPath(), JSON.stringify(store, null, 2));
 }
 
 export function createSession(task: string, etaText: string, etaMs: number): Session {

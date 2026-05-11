@@ -14,7 +14,10 @@ A CLI that times the gap between your AI's confident estimate and your actual sh
 ![the brag card](assets/social-preview.png)
 
 ```
-$ twoweeks "build the auth flow"
+# 1. AI says "build the auth flow"? About 2 weeks of focused work.
+# 2. You paste what it said into twoweeks. The estimate is its, not ours.
+
+$ twoweeks "build the auth flow" "2 weeks"
 ⏰ 2 weeks remaining for: build the auth flow
    Worst case, the AI is right. Best case, you ship.
 
@@ -61,11 +64,24 @@ cd twoweeks && bun install && bun link
 
 Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single local JSON file at `~/.twoweeks/history.json`. No cloud, no telemetry, no accounts.
 
+## Why `"<eta>"` is required
+
+The whole joke is timing the gap between what the AI said and what actually happens. So **you have to tell twoweeks what the AI said.** There's no default of "2 weeks" — that would be the tool inventing the joke instead of capturing it. Pass the AI's estimate as the second argument (or `--eta`):
+
+```bash
+twoweeks "build the auth flow" "2 weeks"
+twoweeks "ship the migration"  "3 months"
+twoweeks "fix the bug"         "5 hours"
+twoweeks "refactor the parser" --eta "1 day"
+```
+
+The name `twoweeks` is the meme — what AIs always say. The tool measures whatever they actually said.
+
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `twoweeks "task"` | Start a 2-week timer for the task |
+| `twoweeks "task" "<eta>"` | Start a timer for the task with the AI's stated estimate |
 | `twoweeks` | Show all active sessions and a status update from the AI |
 | `twoweeks status` | Same as bare command |
 | `twoweeks ship` | Close the most recent active session, print the brag card |
@@ -80,7 +96,7 @@ Runs on **Node 18+** or **[Bun](https://bun.sh)** 1.0+. Storage is a single loca
 
 | Flag | What it does |
 |---|---|
-| `--eta "3 months"` | Override the default 2-week ETA when starting |
+| `--eta "3 months"` | Provide AI estimate via flag instead of positional |
 | `--force` | Start a new session even if one is already active |
 | `--to-bluesky` | Share to Bluesky instead of X |
 | `--to-mastodon` | Share to Mastodon instead of X |

@@ -97,3 +97,20 @@ Released:
 
 This is the 5→6 push, executed in one autopilot run instead of the 60-day plan I originally wrote.
 
+## Round 4 — fix the "we invented the joke" bug (v0.5.0)
+
+User caught a real product flaw: defaulting every session to "2 weeks" means the tool generates the AI's estimate instead of capturing it. The whole premise is timing the gap; if we hardcode the gap, we're staging it.
+
+Changes:
+
+- **Removed the 2-week default.** `twoweeks "task"` with no estimate now errors with a friendly message explaining the philosophy and showing the right invocation.
+- **Estimate is required as the second positional arg** (or via `--eta` flag): `twoweeks "build the auth flow" "2 weeks"`. The CLI knows which positionals are subcommands and which are tasks/estimates via an explicit `KNOWN_COMMANDS` set in `cli.ts`.
+- **`DEFAULT_ETA_MS/TEXT` renamed to `SAMPLE_ETA_MS/TEXT`** in `src/eta.ts` — same value (2 weeks) but used only by the social-preview generator and help-text example. Never silently applied to user sessions.
+- **`db.ts` switched to lazy path resolution.** Previously, `DB_PATH` was computed at module import time. After two test files set different `TWOWEEKS_HOME` values, both wrote to the first file's directory. Now `dbPath()` re-reads the env on every operation. Tests are properly isolated.
+- **`tests/start.test.ts` added** — covers the new required-ETA behavior (4 tests: empty task rejected, missing ETA rejected, valid ETA accepted, unparseable ETA rejected). Total tests: 43 (was 39).
+- **README updated** with a dedicated "Why `<eta>` is required" section explaining the philosophy. Example commands updated to show the two-positional pattern.
+- **CLI help** rewritten with the new usage syntax and an "Examples:" block showing the canonical flow (AI says X, you ship in Y, run the brag command).
+- **Version bumped to v0.5.0.** Breaking change documented (pre-1.0 minor bump is fine).
+
+Honest framing: this was a bug that office-hours rigor caught while I was already in autopilot mode. The product is now actually what the joke claims it is.
+

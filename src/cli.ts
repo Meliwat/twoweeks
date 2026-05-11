@@ -9,44 +9,53 @@ import { screenshotCmd } from "./commands/screenshot.ts";
 import { c } from "./colors.ts";
 import type { ShareTarget } from "./commands/share.ts";
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 
 const HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}
 
-${c.italic("Why your AI assistant always says two weeks but you ship by lunch.")}
+${c.italic("Time the gap between your AI's estimate and your actual ship time.")}
 
 ${c.bold("Usage:")}
-  ${c.bold("twoweeks \"task\"")}              Start a 2-week timer for "task"
-  ${c.bold("twoweeks")}                     Show all active sessions + flair
-  ${c.bold("twoweeks status")}              Same as bare command
-  ${c.bold("twoweeks ship")}                Ship the most recent active session
-  ${c.bold("twoweeks ship --share")}        Ship and open X with brag pre-filled
-  ${c.bold("twoweeks ship --screenshot")}   Ship and save a 1200x630 PNG of the brag card
-  ${c.bold("twoweeks screenshot [id]")}     Render a PNG for a shipped session (default: most recent)
-  ${c.bold("twoweeks share [id]")}          Open X intent (default: most recent shipped)
-  ${c.bold("twoweeks history")}             Show shipped sessions + lifetime stats
-  ${c.bold("twoweeks abandon")}             Abandon the most recent active session
+  ${c.bold("twoweeks \"task\" \"<eta>\"")}        Start a timer with the AI's stated estimate
+  ${c.bold("twoweeks")}                       Show all active sessions + flair
+  ${c.bold("twoweeks status")}                Same as bare command
+  ${c.bold("twoweeks ship")}                  Ship the most recent active session
+  ${c.bold("twoweeks ship --share")}          Ship and open X with brag pre-filled
+  ${c.bold("twoweeks ship --screenshot")}     Ship and save a 1200x630 PNG of the brag card
+  ${c.bold("twoweeks screenshot [id]")}       Render a PNG for a shipped session
+  ${c.bold("twoweeks share [id]")}            Open X intent (default: most recent shipped)
+  ${c.bold("twoweeks history")}               Show shipped sessions + lifetime stats + achievements
+  ${c.bold("twoweeks abandon")}               Abandon the most recent active session
+
+${c.bold("Examples:")}
+  ${c.dim("# AI said it'd take 2 weeks. You actually shipped in 47 minutes.")}
+  ${c.bold("$ twoweeks \"build the auth flow\" \"2 weeks\"")}
+  ${c.bold("$ twoweeks ship --screenshot")}
+  ${c.dim("# Compression: 428x faster than the AI thought")}
 
 ${c.bold("Flags:")}
-  ${c.bold("--eta \"3 months\"")}             Override the default 2-week ETA on start
-  ${c.bold("--force")}                      Start a new session even if one is active
-  ${c.bold("--to-bluesky")}                 Share to Bluesky instead of X
-  ${c.bold("--to-mastodon")}                Share to Mastodon instead of X
-  ${c.bold("--print")}                      Print the share URL instead of opening
-  ${c.bold("--screenshot")}                 (on ship) Also save a PNG of the brag card
-  ${c.bold("--out <path>")}                 Output path for screenshot command
-  ${c.bold("--open")}                       (on screenshot) Open the PNG after saving
-  ${c.bold("--json")}                       Emit machine-readable JSON
-  ${c.bold("--no-color")}                   Disable ANSI colors (also set ${c.italic("NO_COLOR=1")})
-  ${c.bold("--help, -h")}                   Show this help
-  ${c.bold("--version, -v")}                Show version
+  ${c.bold("--eta \"<duration>\"")}             Provide AI estimate via flag instead of positional
+  ${c.bold("--force")}                        Start a new session even if one is active
+  ${c.bold("--to-bluesky")}                   Share to Bluesky instead of X
+  ${c.bold("--to-mastodon")}                  Share to Mastodon instead of X
+  ${c.bold("--print")}                        Print the share URL instead of opening
+  ${c.bold("--screenshot")}                   (on ship) Also save a PNG of the brag card
+  ${c.bold("--out <path>")}                   Output path for screenshot command
+  ${c.bold("--open")}                         (on screenshot) Open the PNG after saving
+  ${c.bold("--json")}                         Emit machine-readable JSON
+  ${c.bold("--no-color")}                     Disable ANSI colors (also set ${c.italic("NO_COLOR=1")})
+  ${c.bold("--help, -h")}                     Show this help
+  ${c.bold("--version, -v")}                  Show version
+
+${c.bold("ETA format:")}
+  ${c.dim("Examples: \"2 weeks\", \"3 months\", \"1 day\", \"5 hours\", \"30 minutes\"")}
 
 ${c.bold("Storage:")}
-  ${c.dim("~/.twoweeks/history.json")}     ${c.dim("local JSON, no telemetry, no cloud")}
-  ${c.dim("~/.twoweeks/screenshots/")}     ${c.dim("PNG brag cards (1200x630, Open Graph)")}
-  ${c.dim("$TWOWEEKS_HOME")}               ${c.dim("override storage directory")}
-  ${c.dim("$TWOWEEKS_DEBUG")}              ${c.dim("=1 prints stack on unexpected errors")}
+  ${c.dim("~/.twoweeks/history.json")}       ${c.dim("local JSON, no telemetry, no cloud")}
+  ${c.dim("~/.twoweeks/screenshots/")}       ${c.dim("PNG brag cards (1200x630, Open Graph)")}
+  ${c.dim("$TWOWEEKS_HOME")}                 ${c.dim("override storage directory")}
+  ${c.dim("$TWOWEEKS_DEBUG")}                ${c.dim("=1 prints stack on unexpected errors")}
 `;
 
 interface ParsedArgs {
@@ -98,6 +107,16 @@ export function parseArgs(argv: string[]): { args: ParsedArgs; positional: strin
   }
   return { args, positional };
 }
+
+const KNOWN_COMMANDS = new Set([
+  "status",
+  "ship",
+  "screenshot",
+  "share",
+  "abandon",
+  "history",
+  "board",
+]);
 
 function isTruthy(value: string | undefined): boolean {
   if (value === undefined || value === "") return false;
@@ -175,9 +194,17 @@ async function main(): Promise<number> {
     return history({ json: !!args.json });
   }
 
+  // First positional is the task. Second positional (if not a known subcommand)
+  // is the ETA. --eta flag takes precedence if both are provided.
+  const task = command;
+  let etaInput = args.eta;
+  if (!etaInput && positional[1] && !KNOWN_COMMANDS.has(positional[1])) {
+    etaInput = positional[1];
+  }
+
   return start({
-    task: command,
-    eta: args.eta,
+    task,
+    eta: etaInput,
     force: !!args.force,
     json: !!args.json,
   });
