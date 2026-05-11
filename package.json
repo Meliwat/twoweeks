@@ -1,0 +1,39 @@
+{
+  "name": "twoweeks",
+  "version": "0.1.0",
+  "description": "Why your AI assistant always says two weeks but you ship by lunch.",
+  "type": "module",
+  "bin": {
+    "twoweeks": "./src/cli.ts"
+  },
+  "scripts": {
+    "cli": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --target=bun --outfile=dist/cli.js",
+    "start": "bun run src/cli.ts"
+  },
+  "author": "meliwat",
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "claude",
+    "chatgpt",
+    "estimate",
+    "cli",
+    "joke",
+    "productivity"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
