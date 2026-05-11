@@ -43,6 +43,10 @@ Want to brag? Run: twoweeks share 1
 ## Install
 
 ```bash
+# Homebrew (macOS / Linux):
+brew install Meliwat/twoweeks/twoweeks
+twoweeks "task"
+
 # When published to npm:
 npm install -g twoweeks
 twoweeks "task"
