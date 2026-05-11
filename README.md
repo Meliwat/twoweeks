@@ -9,6 +9,8 @@
 
 A tiny CLI that captures your AI's confident time estimate, times how long you actually took, and produces a brag card you can share. No accounts, no cloud, no telemetry — one local JSON file and one shareable PNG.
 
+![demo](assets/demo.gif)
+
 ## Quick start (30 seconds)
 
 ```bash
@@ -24,6 +26,26 @@ twoweeks ship --screenshot                    # close the timer, save a PNG
 ```
 
 That's it. A working CLI in under a minute.
+
+## Zero-touch capture (Claude Code)
+
+The whole joke is purest when the estimate captures itself. If you use Claude Code, install the hook once and forget about it:
+
+```bash
+twoweeks install-hook
+```
+
+That registers a Claude Code Stop hook. Now, the next time Claude says *"this should take about 2 weeks of focused work"*, twoweeks parses it out of the response, stamps the estimate, and starts the timer — no typing required. When you ship, just run `twoweeks ship` and the brag card writes itself.
+
+```text
+🎯 Caught: "about 2 weeks of focused work"
+   Task:      build the auth flow
+   Estimate:  2 weeks (336h)
+
+   Run `twoweeks ship` when you're done.
+```
+
+To remove: `twoweeks uninstall-hook`. To use it from another tool (Cursor, ChatGPT pipe, anything that emits text): `echo "$AI_OUTPUT" | twoweeks watch`.
 
 ## What it does
 
@@ -48,9 +70,11 @@ The PNG is 1200×630 (Open Graph dimensions) and ready to drop into a tweet.
 
 ![sample brag card](assets/social-preview.png)
 
-## Why `"<eta>"` is required
+## Why `"<eta>"` is required (when invoking manually)
 
 The whole joke is timing the gap between what the AI said and what actually happened. So **you have to tell `twoweeks` what the AI said.** There is no default of "2 weeks" — that would be the tool staging the joke instead of capturing it.
+
+(If you'd rather not type the estimate, install the Claude Code hook above — twoweeks will read it straight out of the AI's response.)
 
 ```bash
 twoweeks "build the auth flow"   "2 weeks"
@@ -90,6 +114,9 @@ npm install -g twoweeks
 | `twoweeks share [id]` | Open X with the brag for a shipped session |
 | `twoweeks history` | Shipped sessions + lifetime stats + achievements |
 | `twoweeks abandon` | Abandon the current session (excluded from stats) |
+| `twoweeks install-hook` | Install the Claude Code Stop hook for zero-touch capture |
+| `twoweeks uninstall-hook` | Remove the Claude Code hook |
+| `twoweeks watch` | Read text from stdin, capture an AI estimate if one is found |
 
 ## Flags
 
@@ -153,6 +180,16 @@ ratio = eta_ms / actual_ms
 
 A 2-week estimate shipped in 47 minutes is ~428x compression. The CLI then offers to open X (or Bluesky, or Mastodon) with a pre-filled brag, generate a shareable PNG, or both.
 
+### Auto-capture parser
+
+When the hook fires (or you pipe text into `twoweeks watch`), the parser scans for plan-shaped estimate phrases:
+
+- `"2 weeks"`, `"about three months"`, `"roughly an hour"`, `"around 5 days of focused work"`
+- `"weeks 1-6"`, `"days 1 through 10"`, `"weeks 2 to 8"` — the upper bound wins
+- `"by end of week 4"`
+
+The **biggest** estimate found wins (assumption: the AI is naming the outer time window, not the inside-the-plan substeps). The matched phrase is captured verbatim as the receipt — it shows up in the brag card and on the share text. First-write-wins: if an active session already exists, the hook is a no-op.
+
 ## Scripting
 
 Every command supports `--json` for piping:
@@ -191,7 +228,7 @@ Local JSON at `~/.twoweeks/history.json`. PNG brag cards at `~/.twoweeks/screens
 ```bash
 bun install            # install dev dependencies (Bun preferred for fast tests)
 bun run cli "task" "2 weeks"
-bun test               # run the test suite (43 tests)
+bun test               # run the test suite (74 tests)
 bun run build          # build dist/cli.js (Node-compatible bundle)
 ```
 

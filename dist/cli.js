@@ -1356,8 +1356,460 @@ function openFile(path) {
   } catch {}
 }
 
+// src/commands/watch.ts
+import { readFileSync as readFileSync4 } from "node:fs";
+
+// src/parser.ts
+import { readFileSync as readFileSync3, existsSync as existsSync3 } from "node:fs";
+var UNIT_MS = {
+  minute: 60 * 1000,
+  hour: 60 * 60 * 1000,
+  day: 24 * 60 * 60 * 1000,
+  week: 7 * 24 * 60 * 60 * 1000,
+  month: 30 * 24 * 60 * 60 * 1000
+};
+var NUMBER_WORDS = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12
+};
+function numericValue(raw) {
+  const trimmed = raw.trim().toLowerCase();
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const n = parseFloat(trimmed);
+    if (n > 0)
+      return n;
+    return null;
+  }
+  return NUMBER_WORDS[trimmed] ?? null;
+}
+function findEstimates(text) {
+  if (!text)
+    return [];
+  const matches = [];
+  const plainRe = /(?:about|around|roughly|approximately|maybe|likely|probably|estimated?|estimate(?:d)?\s+at|takes?|take\s+about|will\s+take|should\s+take)?\s*(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a|an)\s+(minute|hour|day|week|month)s?(?:\s+of\s+(?:focused\s+)?work)?/gi;
+  for (const m of text.matchAll(plainRe)) {
+    const n = numericValue(m[1]);
+    const unit = m[2].toLowerCase();
+    if (n === null || !UNIT_MS[unit])
+      continue;
+    const ms = n * UNIT_MS[unit];
+    if (ms <= 0)
+      continue;
+    const valueText = formatEstimateText(n, unit);
+    matches.push({
+      text: valueText,
+      ms,
+      quote: m[0].trim()
+    });
+  }
+  const rangeRe = /(minute|hour|day|week|month)s?\s+\d+\s*(?:-|–|through|to)\s*(\d+)/gi;
+  for (const m of text.matchAll(rangeRe)) {
+    const unit = m[1].toLowerCase();
+    const upper = parseInt(m[2], 10);
+    if (!UNIT_MS[unit] || isNaN(upper) || upper <= 0)
+      continue;
+    const ms = upper * UNIT_MS[unit];
+    matches.push({
+      text: formatEstimateText(upper, unit),
+      ms,
+      quote: m[0].trim()
+    });
+  }
+  const byWeekRe = /by\s+(?:the\s+)?(?:end\s+of\s+)?(week|month|day)\s+(\d+)/gi;
+  for (const m of text.matchAll(byWeekRe)) {
+    const unit = m[1].toLowerCase();
+    const n = parseInt(m[2], 10);
+    if (!UNIT_MS[unit] || isNaN(n) || n <= 0)
+      continue;
+    matches.push({
+      text: formatEstimateText(n, unit),
+      ms: n * UNIT_MS[unit],
+      quote: m[0].trim()
+    });
+  }
+  matches.sort((a, b) => b.ms - a.ms);
+  return matches;
+}
+function formatEstimateText(n, unit) {
+  const rounded = Math.max(1, Math.round(n));
+  return `${rounded} ${unit}${rounded === 1 ? "" : "s"}`;
+}
+function bestEstimate(text) {
+  const all = findEstimates(text);
+  return all[0] ?? null;
+}
+function inferTaskFromUserMessage(message) {
+  if (!message)
+    return null;
+  let t = message.replace(/\s+/g, " ").trim();
+  const leaders = [
+    /^(?:hi|hey|hello)[\s,.!]+/i,
+    /^(?:can|could|would|will)\s+you\s+/i,
+    /^(?:please\s+)?help\s+me\s+/i,
+    /^please\s+/i,
+    /^i\s+(?:want|need|would\s+like)\s+(?:to|you\s+to)\s+/i,
+    /^let'?s\s+/i,
+    /^we\s+need\s+to\s+/i
+  ];
+  for (let pass = 0;pass < 3; pass++) {
+    for (const re of leaders) {
+      const before = t;
+      t = t.replace(re, "");
+      if (t !== before)
+        break;
+    }
+  }
+  t = t.trim().replace(/^[.,;:!?]+/, "").trim();
+  if (t.length < 3)
+    return null;
+  const sentenceEnd = t.search(/[.!?]\s|[\n\r]/);
+  if (sentenceEnd > 2)
+    t = t.slice(0, sentenceEnd);
+  t = t.replace(/[.!?]+\s*$/, "").trim();
+  const chars = [...t];
+  if (chars.length > 80)
+    t = chars.slice(0, 79).join("") + "…";
+  return t.trim();
+}
+function readTranscript(path) {
+  const empty = { lastAssistantText: "", lastUserText: "" };
+  if (!path || !existsSync3(path))
+    return empty;
+  let raw;
+  try {
+    raw = readFileSync3(path, "utf-8");
+  } catch {
+    return empty;
+  }
+  const lines = raw.split(`
+`).filter((l) => l.trim().length > 0);
+  let lastAssistant = "";
+  let lastAssistantIndex = -1;
+  const events = [];
+  for (let i = 0;i < lines.length; i++) {
+    const text = extractTextFromLine(lines[i]);
+    if (!text)
+      continue;
+    if (text.role === "assistant") {
+      events.push(text);
+      lastAssistantIndex = events.length - 1;
+    } else if (text.role === "user") {
+      events.push(text);
+    }
+  }
+  if (lastAssistantIndex < 0)
+    return empty;
+  lastAssistant = events[lastAssistantIndex].text;
+  let lastUser = "";
+  for (let i = lastAssistantIndex - 1;i >= 0; i--) {
+    if (events[i].role === "user") {
+      lastUser = events[i].text;
+      break;
+    }
+  }
+  return { lastAssistantText: lastAssistant, lastUserText: lastUser };
+}
+function extractTextFromLine(line) {
+  let obj;
+  try {
+    obj = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj !== "object")
+    return null;
+  const o = obj;
+  const typeField = o.type;
+  const role = o.role ?? typeField;
+  if (role !== "user" && role !== "assistant")
+    return null;
+  const message = o.message ?? o;
+  const content = message.content;
+  let text = "";
+  if (typeof content === "string") {
+    text = content;
+  } else if (Array.isArray(content)) {
+    for (const block of content) {
+      if (block && typeof block === "object") {
+        const b = block;
+        if (b.type === "text" && typeof b.text === "string") {
+          text += (text ? `
+` : "") + b.text;
+        } else if (typeof b.text === "string") {
+          text += (text ? `
+` : "") + b.text;
+        }
+      } else if (typeof block === "string") {
+        text += (text ? `
+` : "") + block;
+      }
+    }
+  }
+  if (!text)
+    return null;
+  return { role, text };
+}
+
+// src/commands/watch.ts
+async function watch(args) {
+  let assistantText = "";
+  let userText = "";
+  if (args.fromHook) {
+    const stdinRaw = await readAllStdin();
+    let payload = {};
+    try {
+      payload = JSON.parse(stdinRaw || "{}");
+    } catch {}
+    if (payload.transcript_path) {
+      const t = readTranscript(payload.transcript_path);
+      assistantText = t.lastAssistantText;
+      userText = t.lastUserText;
+    } else if (stdinRaw.trim().length > 0) {
+      assistantText = stdinRaw;
+    }
+  } else if (args.fromPath) {
+    if (args.fromPath.endsWith(".jsonl")) {
+      const t = readTranscript(args.fromPath);
+      assistantText = t.lastAssistantText;
+      userText = t.lastUserText;
+    } else {
+      try {
+        assistantText = readFileSync4(args.fromPath, "utf-8");
+      } catch (err) {
+        return emit({ args, ok: false, error: `cannot read ${args.fromPath}: ${err.message}` });
+      }
+    }
+  } else {
+    assistantText = await readAllStdin();
+  }
+  if (!assistantText || assistantText.trim().length === 0) {
+    return emit({ args, ok: false, error: "no_text", message: "Nothing on stdin / transcript was empty." });
+  }
+  const match = bestEstimate(assistantText);
+  if (!match) {
+    return emit({ args, ok: false, error: "no_estimate", message: "No estimate phrase found in the text." });
+  }
+  const existing = getMostRecentActive();
+  if (existing) {
+    return emit({
+      args,
+      ok: false,
+      error: "active_session_exists",
+      message: `Already tracking "${existing.task}". Ship or abandon it first.`,
+      existing
+    });
+  }
+  const task = args.task?.trim() || inferTaskFromUserMessage(userText) || "Claude's plan";
+  const session = createSession(task, match.text, match.ms, match.quote);
+  if (args.json) {
+    console.log(JSON.stringify({ ok: true, session, captured: match }));
+    return 0;
+  }
+  if (args.quiet) {
+    return 0;
+  }
+  const verb = args.fromHook ? "Caught" : "Captured";
+  console.log("");
+  console.log(`${c.brightGreen("\uD83C\uDFAF")} ${c.bold(verb + ":")} ${c.italic('"' + match.quote + '"')}`);
+  console.log(`   ${c.dim("Task:")}      ${c.bold(task)}`);
+  console.log(`   ${c.dim("Estimate:")}  ${c.brightCyan(match.text)} ${c.dim("(" + Math.round(match.ms / (60 * 60 * 1000)) + "h)")}`);
+  console.log("");
+  console.log(c.dim("   Run `twoweeks ship` when you're done."));
+  console.log("");
+  return 0;
+}
+function emit({ args, ok, error, message, existing }) {
+  if (args.json) {
+    const payload = { ok };
+    if (error)
+      payload.error = error;
+    if (message)
+      payload.message = message;
+    if (existing)
+      payload.existing = existing;
+    console.log(JSON.stringify(payload));
+    return ok ? 0 : error === "active_session_exists" ? 0 : 1;
+  }
+  if (args.quiet) {
+    return 0;
+  }
+  if (!ok && message) {
+    console.error(c.dim(message));
+  }
+  return 0;
+}
+async function readAllStdin() {
+  if (process.stdin.isTTY)
+    return "";
+  return await new Promise((resolve2) => {
+    let data = "";
+    process.stdin.setEncoding("utf-8");
+    process.stdin.on("data", (chunk) => data += chunk);
+    process.stdin.on("end", () => resolve2(data));
+    process.stdin.on("error", () => resolve2(data));
+  });
+}
+
+// src/commands/install-hook.ts
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync3, mkdirSync as mkdirSync3, existsSync as existsSync4 } from "node:fs";
+import { join as join3, dirname as dirname2 } from "node:path";
+import { homedir as homedir3 } from "node:os";
+var HOOK_COMMAND = "twoweeks watch --from-hook --quiet";
+var HOOK_TAG = "twoweeks-auto-capture";
+function settingsPath(scope) {
+  if (scope === "user")
+    return join3(homedir3(), ".claude", "settings.json");
+  return join3(process.cwd(), ".claude", "settings.json");
+}
+function load2(path) {
+  if (!existsSync4(path))
+    return {};
+  try {
+    const raw = readFileSync5(path, "utf-8");
+    if (raw.trim().length === 0)
+      return {};
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Could not parse ${path}: ${err.message}`);
+  }
+}
+function save2(path, data) {
+  mkdirSync3(dirname2(path), { recursive: true });
+  writeFileSync3(path, JSON.stringify(data, null, 2) + `
+`);
+}
+function installHook(args) {
+  const scope = args.scope ?? "user";
+  const path = settingsPath(scope);
+  const command = args.command ?? HOOK_COMMAND;
+  let settings;
+  try {
+    settings = load2(path);
+  } catch (err) {
+    const msg = err.message;
+    if (args.json)
+      console.error(JSON.stringify({ ok: false, error: msg }));
+    else
+      console.error(c.brightRed("Error:") + " " + msg);
+    return 1;
+  }
+  if (args.uninstall) {
+    return doUninstall({ args, scope, path, settings });
+  }
+  settings.hooks ??= {};
+  const stopHooks = settings.hooks.Stop ??= [];
+  for (const group of stopHooks) {
+    for (const h of group.hooks ?? []) {
+      if (h._twoweeks === HOOK_TAG) {
+        if (args.json) {
+          console.log(JSON.stringify({ ok: true, already_installed: true, path }));
+        } else {
+          console.log(c.dim("Auto-capture is already installed at ") + path);
+        }
+        return 0;
+      }
+    }
+  }
+  stopHooks.push({
+    matcher: "",
+    hooks: [
+      {
+        type: "command",
+        command,
+        _twoweeks: HOOK_TAG
+      }
+    ]
+  });
+  try {
+    save2(path, settings);
+  } catch (err) {
+    const msg = `Could not write ${path}: ${err.message}`;
+    if (args.json)
+      console.error(JSON.stringify({ ok: false, error: msg }));
+    else
+      console.error(c.brightRed("Error:") + " " + msg);
+    return 1;
+  }
+  if (args.json) {
+    console.log(JSON.stringify({ ok: true, installed: true, path, command }));
+    return 0;
+  }
+  console.log("");
+  console.log(`${c.brightGreen("✓")} Auto-capture installed.`);
+  console.log(`   ${c.dim("Hook:")}     ${c.bold("Stop")} → ${c.italic(command)}`);
+  console.log(`   ${c.dim("Settings:")} ${path}`);
+  console.log("");
+  console.log(c.dim('Next time Claude says "this should take 2 weeks," twoweeks catches it.'));
+  console.log(c.dim("Run `twoweeks ship` when you're done. Or `twoweeks uninstall-hook` to undo."));
+  console.log("");
+  return 0;
+}
+function doUninstall({
+  args,
+  scope: _scope,
+  path,
+  settings
+}) {
+  if (!settings.hooks?.Stop) {
+    if (args.json)
+      console.log(JSON.stringify({ ok: true, removed: false, path }));
+    else
+      console.log(c.dim("No twoweeks hook found at ") + path);
+    return 0;
+  }
+  let removed = 0;
+  const newGroups = [];
+  for (const group of settings.hooks.Stop) {
+    const keep = [];
+    for (const h of group.hooks ?? []) {
+      if (h._twoweeks === HOOK_TAG) {
+        removed++;
+      } else {
+        keep.push(h);
+      }
+    }
+    if (keep.length > 0)
+      newGroups.push({ ...group, hooks: keep });
+  }
+  settings.hooks.Stop = newGroups;
+  if (newGroups.length === 0)
+    delete settings.hooks.Stop;
+  try {
+    save2(path, settings);
+  } catch (err) {
+    const msg = `Could not write ${path}: ${err.message}`;
+    if (args.json)
+      console.error(JSON.stringify({ ok: false, error: msg }));
+    else
+      console.error(c.brightRed("Error:") + " " + msg);
+    return 1;
+  }
+  if (args.json) {
+    console.log(JSON.stringify({ ok: true, removed: removed > 0, count: removed, path }));
+    return 0;
+  }
+  if (removed > 0) {
+    console.log(`${c.brightGreen("✓")} Removed ${removed} twoweeks hook${removed === 1 ? "" : "s"} from ${path}.`);
+  } else {
+    console.log(c.dim("No twoweeks hook found at ") + path);
+  }
+  return 0;
+}
+
 // src/cli.ts
-var VERSION = "0.6.0";
+var VERSION = "0.7.0";
 var HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}
 
@@ -1374,12 +1826,19 @@ ${c.bold("Usage:")}
   ${c.bold("twoweeks share [id]")}             Open X intent (default: most recent shipped)
   ${c.bold("twoweeks history")}                Show shipped sessions + lifetime stats + achievements
   ${c.bold("twoweeks abandon")}                Abandon the most recent active session
+  ${c.bold("twoweeks install-hook")}           Auto-capture Claude's estimates in Claude Code  ${c.dim("(zero invocation)")}
+  ${c.bold("twoweeks uninstall-hook")}         Remove the Claude Code auto-capture hook
+  ${c.bold("twoweeks watch")}                  Read text from stdin, capture an estimate if found
 
 ${c.bold("Examples:")}
   ${c.dim("# AI said it'd take 2 weeks. You actually shipped in 47 minutes.")}
   ${c.bold('$ twoweeks "build the auth flow" "2 weeks"')}
   ${c.bold("$ twoweeks ship --screenshot --copy")}
   ${c.dim("# Compression: 428x faster than the AI thought (and the PNG is on your clipboard)")}
+
+  ${c.dim("# Or zero-touch: install the Claude Code hook and forget about it.")}
+  ${c.bold("$ twoweeks install-hook")}
+  ${c.dim('# Next time Claude says "about 2 weeks of focused work," twoweeks catches it.')}
 
 ${c.bold("Flags:")}
   ${c.bold('--eta "<duration>"')}              AI estimate via flag instead of second positional
@@ -1432,6 +1891,14 @@ function parseArgs(argv) {
       args.open = true;
     else if (a === "--copy")
       args.copy = true;
+    else if (a === "--quiet")
+      args.quiet = true;
+    else if (a === "--from-hook")
+      args.fromHook = true;
+    else if (a === "--project")
+      args.scope = "project";
+    else if (a === "--user")
+      args.scope = "user";
     else if (a === "--plain") {
       args.plain = true;
       process.env.NO_COLOR = "1";
@@ -1466,6 +1933,16 @@ function parseArgs(argv) {
       i++;
     } else if (a.startsWith("--out=")) {
       args.out = a.slice("--out=".length);
+    } else if (a === "--from") {
+      args.from = argv[i + 1];
+      i++;
+    } else if (a.startsWith("--from=")) {
+      args.from = a.slice("--from=".length);
+    } else if (a === "--task") {
+      args.task = argv[i + 1];
+      i++;
+    } else if (a.startsWith("--task=")) {
+      args.task = a.slice("--task=".length);
     } else {
       positional.push(a);
     }
@@ -1479,7 +1956,10 @@ var KNOWN_COMMANDS = new Set([
   "share",
   "abandon",
   "history",
-  "board"
+  "board",
+  "watch",
+  "install-hook",
+  "uninstall-hook"
 ]);
 function isTruthy(value) {
   if (value === undefined || value === "")
@@ -1553,6 +2033,22 @@ async function main() {
   }
   if (command === "history" || command === "board") {
     return history({ json: !!args.json, plain: !!args.plain, noEmoji: !!args.noEmoji });
+  }
+  if (command === "watch") {
+    return await watch({
+      fromPath: args.from,
+      fromHook: !!args.fromHook,
+      task: args.task,
+      quiet: !!args.quiet,
+      json: !!args.json,
+      plain: !!args.plain
+    });
+  }
+  if (command === "install-hook") {
+    return installHook({ scope: args.scope, json: !!args.json });
+  }
+  if (command === "uninstall-hook") {
+    return installHook({ uninstall: true, scope: args.scope, json: !!args.json });
   }
   const task = command;
   let etaInput = args.eta;

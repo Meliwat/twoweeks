@@ -6,10 +6,12 @@ import { share } from "./commands/share.ts";
 import { abandon } from "./commands/abandon.ts";
 import { history } from "./commands/history.ts";
 import { screenshotCmd } from "./commands/screenshot.ts";
+import { watch } from "./commands/watch.ts";
+import { installHook } from "./commands/install-hook.ts";
 import { c } from "./colors.ts";
 import type { ShareTarget } from "./commands/share.ts";
 
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 
 const HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}
@@ -27,12 +29,19 @@ ${c.bold("Usage:")}
   ${c.bold("twoweeks share [id]")}             Open X intent (default: most recent shipped)
   ${c.bold("twoweeks history")}                Show shipped sessions + lifetime stats + achievements
   ${c.bold("twoweeks abandon")}                Abandon the most recent active session
+  ${c.bold("twoweeks install-hook")}           Auto-capture Claude's estimates in Claude Code  ${c.dim("(zero invocation)")}
+  ${c.bold("twoweeks uninstall-hook")}         Remove the Claude Code auto-capture hook
+  ${c.bold("twoweeks watch")}                  Read text from stdin, capture an estimate if found
 
 ${c.bold("Examples:")}
   ${c.dim("# AI said it'd take 2 weeks. You actually shipped in 47 minutes.")}
   ${c.bold("$ twoweeks \"build the auth flow\" \"2 weeks\"")}
   ${c.bold("$ twoweeks ship --screenshot --copy")}
   ${c.dim("# Compression: 428x faster than the AI thought (and the PNG is on your clipboard)")}
+
+  ${c.dim("# Or zero-touch: install the Claude Code hook and forget about it.")}
+  ${c.bold("$ twoweeks install-hook")}
+  ${c.dim("# Next time Claude says \"about 2 weeks of focused work,\" twoweeks catches it.")}
 
 ${c.bold("Flags:")}
   ${c.bold("--eta \"<duration>\"")}              AI estimate via flag instead of second positional
@@ -72,10 +81,15 @@ interface ParsedArgs {
   copy?: boolean;
   plain?: boolean;
   noEmoji?: boolean;
+  quiet?: boolean;
+  fromHook?: boolean;
   out?: string;
   eta?: string;
   quote?: string;
   challenge?: string;
+  from?: string;
+  task?: string;
+  scope?: "user" | "project";
   shareTarget?: ShareTarget;
 }
 
@@ -99,6 +113,10 @@ export function parseArgs(argv: string[]): { args: ParsedArgs; positional: strin
     else if (a === "--screenshot") args.screenshot = true;
     else if (a === "--open") args.open = true;
     else if (a === "--copy") args.copy = true;
+    else if (a === "--quiet") args.quiet = true;
+    else if (a === "--from-hook") args.fromHook = true;
+    else if (a === "--project") args.scope = "project";
+    else if (a === "--user") args.scope = "user";
     else if (a === "--plain") {
       args.plain = true;
       process.env.NO_COLOR = "1";
@@ -129,6 +147,16 @@ export function parseArgs(argv: string[]): { args: ParsedArgs; positional: strin
       i++;
     } else if (a.startsWith("--out=")) {
       args.out = a.slice("--out=".length);
+    } else if (a === "--from") {
+      args.from = argv[i + 1];
+      i++;
+    } else if (a.startsWith("--from=")) {
+      args.from = a.slice("--from=".length);
+    } else if (a === "--task") {
+      args.task = argv[i + 1];
+      i++;
+    } else if (a.startsWith("--task=")) {
+      args.task = a.slice("--task=".length);
     } else {
       positional.push(a);
     }
@@ -144,6 +172,9 @@ const KNOWN_COMMANDS = new Set([
   "abandon",
   "history",
   "board",
+  "watch",
+  "install-hook",
+  "uninstall-hook",
 ]);
 
 function isTruthy(value: string | undefined): boolean {
@@ -226,6 +257,25 @@ async function main(): Promise<number> {
 
   if (command === "history" || command === "board") {
     return history({ json: !!args.json, plain: !!args.plain, noEmoji: !!args.noEmoji });
+  }
+
+  if (command === "watch") {
+    return await watch({
+      fromPath: args.from,
+      fromHook: !!args.fromHook,
+      task: args.task,
+      quiet: !!args.quiet,
+      json: !!args.json,
+      plain: !!args.plain,
+    });
+  }
+
+  if (command === "install-hook") {
+    return installHook({ scope: args.scope, json: !!args.json });
+  }
+
+  if (command === "uninstall-hook") {
+    return installHook({ uninstall: true, scope: args.scope, json: !!args.json });
   }
 
   // First positional is the task. Second positional (if not a known subcommand)

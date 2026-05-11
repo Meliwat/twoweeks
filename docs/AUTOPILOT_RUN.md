@@ -177,3 +177,43 @@ P1 work shipped this round (all in one batch, no checkpoints):
 - README has badges (tests, license, runtime, stars) above the fold — signals "real project" at a glance
 
 Released as v0.6.0. Tag + GitHub Release + tap update + push, in one batch.
+
+## Round 6 — auto-detect AI estimates (v0.7.0, 2026-05-11)
+
+User in the current conversation hit the manual-invocation friction directly: "you, when you have a task, will automatically say: this in the first week, this in weeks 2-6, this in week 6-10... I don't want it to be necessarily prompted." Then: "scope it with office hours, but answer it with auto-pilot."
+
+### Office-hours scoping (internal)
+
+- **Demand reality:** N=1 confirmed user friction in the very session that produced the feature ask. The joke is purest when capture is automatic; manual transcription dilutes it.
+- **Status quo:** `twoweeks "task" "2 weeks"` requires the user to (a) remember the tool exists, (b) copy the AI's estimate verbatim, (c) coin a task name — all in the moment of receiving the estimate, which kills spontaneity.
+- **Desperate user:** Claude Code users planning multi-week work. They literally see "weeks 1-2: setup" inline in Claude responses. They're already in a CLI environment where hooks are native, and Claude is their AI.
+- **Narrowest wedge:** Claude Code Stop hook + a generic `twoweeks watch` command that parses any text stream. Hook is a thin shim over `watch`. `watch` works standalone for non-Claude-Code users (Cursor pipe, ChatGPT clipboard paste, etc.).
+- **Observation:** I can build the parser against my own response patterns. The codebase already has the surface — adding two commands, no architectural changes.
+- **Future-fit:** Parser logic transfers to a browser extension later. Hook format is stable in Claude Code.
+
+### Decisions
+
+- **One feature, two commands:** `twoweeks watch [--from <path>] [--quiet] [--json]` and `twoweeks install-hook [--uninstall]`. No `unwatch`. The hook IS the daemon; users uninstall via the same command with a flag.
+- **Parser scope:** numeric estimates only ("2 weeks", "3 days", "5 hours"). Phase ranges ("weeks 1-6" → 6 weeks). The biggest detected estimate wins (assumption: AIs lead with the outer time window).
+- **Task inference:** scan transcript for the most recent USER message before this assistant turn, strip "Can you / Please / Help me" prefixes, take first ~60 chars. If transcript is just stdin text (no structure), default task to "Claude's plan".
+- **First-write-wins:** if an active session exists, hook exits silently. No spam, no override. The user controls re-capture via `twoweeks abandon`.
+- **Watch in non-hook mode:** prints what it captured. In hook mode (`--quiet`): silent on no-match, silent on success.
+- **AI quote capture:** the parser also captures the matched phrase verbatim (e.g., "About 2 weeks of focused work.") and attaches it to the session via the existing `--quote` field. Auto-receipt.
+- **Bun-only test imports kept:** `bun:test` is already the test runner. New tests follow the same pattern.
+- **No new dependencies.** Parser is a regex + small AST. Hook installer is a JSON edit. Both pure Node-compat code.
+- **Demo gif:** committed alongside the feature (the new 1.35MB real screen recording from the crashed prior session).
+
+### Files added
+
+- `src/parser.ts` — estimate parser, task inference, transcript reader
+- `src/commands/watch.ts` — watch command
+- `src/commands/install-hook.ts` — hook installer
+- `tests/parser.test.ts` — parser unit tests
+- `tests/watch.test.ts` — watch integration tests
+
+### Files modified
+
+- `src/cli.ts` — register `watch` / `install-hook` / `uninstall-hook` commands, bump VERSION
+- `package.json` — bump to 0.7.0, expand keywords
+- `README.md` — Auto-capture section
+- `.gitignore` — add `assets/recordings/`
