@@ -4,6 +4,8 @@
 
 A CLI that times the gap between your AI's confident estimate and your actual ship time. Built for the era where "this is a multi-month project" turns into a single Friday afternoon.
 
+![demo](assets/demo.gif)
+
 ```
 $ twoweeks "build the auth flow"
 ⏰ 2 weeks remaining for: build the auth flow
@@ -27,24 +29,35 @@ Saved:       13d 23h 12m
 Want to brag? Run: twoweeks share 1
 ```
 
+## Requirements
+
+Requires [Bun](https://bun.sh) `>= 1.0`. `twoweeks` uses `bun:sqlite` (Bun's built-in SQLite) instead of `better-sqlite3` because `better-sqlite3` doesn't run under Bun yet ([oven-sh/bun#4290](https://github.com/oven-sh/bun/issues/4290)). So Bun is the required runtime, not Node.
+
+Install Bun:
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
 ## Install
 
-**v1 development (requires [Bun](https://bun.sh)):**
+**Via npm (when published):**
+
+```bash
+npm install -g twoweeks
+# or
+bunx twoweeks "task"
+```
+
+`npx twoweeks` works too IF you have Bun installed (the shebang is `#!/usr/bin/env bun`).
+
+**From source:**
 
 ```bash
 git clone https://github.com/meliwat/twoweeks
 cd twoweeks
 bun install
 bun run cli "build the auth flow"
-```
-
-**npm (when published):**
-
-```bash
-npx twoweeks "task"
-# or
-npm install -g twoweeks
-twoweeks "task"
 ```
 
 ## Commands

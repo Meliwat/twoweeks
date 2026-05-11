@@ -2,17 +2,26 @@
   "name": "twoweeks",
   "version": "0.1.0",
   "description": "Why your AI assistant always says two weeks but you ship by lunch.",
+  "author": "meliwat",
+  "license": "MIT",
   "type": "module",
   "bin": {
-    "twoweeks": "./src/cli.ts"
+    "twoweeks": "./dist/cli.js"
   },
   "scripts": {
     "cli": "bun run src/cli.ts",
-    "build": "bun build src/cli.ts --target=bun --outfile=dist/cli.js",
+    "build": "bun build src/cli.ts --target=bun --outfile=dist/cli.js && chmod +x dist/cli.js",
+    "prepublishOnly": "bun run build",
     "start": "bun run src/cli.ts"
   },
-  "author": "meliwat",
-  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "ai",
     "claude",
@@ -20,16 +29,9 @@
     "estimate",
     "cli",
     "joke",
-    "productivity"
+    "productivity",
+    "bun"
   ],
-  "files": [
-    "src",
-    "README.md",
-    "LICENSE"
-  ],
-  "engines": {
-    "bun": ">=1.0.0"
-  },
   "devDependencies": {
     "@types/bun": "latest"
   },
