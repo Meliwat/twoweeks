@@ -46,3 +46,23 @@ User asked for 5-star product. Iterating until a fresh subagent rates it 5/5. Ro
 
 Spawning reviewer next.
 
+## Round 2 — addressing 4/5 review feedback
+
+Reviewer flagged: demo gif insufficient, Bun-only runtime locks out npm users, ratio precision swallows the over-budget joke, no `--json` output, `TWOWEEKS_DEBUG` truthy bug, no CI badge, no static screenshot. Fixed everything except the static screenshot (low priority; the animated gif is the asset).
+
+- **Replaced `bun:sqlite` with JSON file storage** at `~/.twoweeks/history.json`. Runs on Node 18+ AND Bun, no native deps, no SQLite. Build target switched to `--target=node`, shebang to `#!/usr/bin/env node`, `package.json#engines.node` set, `engines.bun` removed. `npx twoweeks` now works on a vanilla Node install.
+- **Float compression ratios.** `computeRatio` no longer rounds. `formatRatio` chooses precision based on magnitude: 3 decimals < 1x, 2 decimals 1-10x, integer 10-1000x, K/M compaction above. Over-budget case (ship at 2x ETA) now displays as `0.500x` with the milestone "Slower than estimated, but not by much. The AI was almost right." Sub-0.5x gets a sharper line: "Significantly slower. The AI was, against all odds, correct."
+- **`--json` flag** added to every command (status, start, ship, share, abandon, history). Emits `{ ok: true|false, ... }` objects with full session payloads, computed ratios, milestone text, share URLs. Pipes cleanly into `jq`.
+- **`TWOWEEKS_DEBUG` truthy bug fixed.** New `isTruthy` helper rejects `0`, `false`, `no`, `off` and empty string. Same logic as `NO_COLOR`.
+- **CI workflow** at `.github/workflows/test.yml` runs on push + PR, tests on ubuntu + macos, smoke-tests the built CLI under both Bun and Node runtimes. Test badge in README.
+- **Demo gif re-recorded** with `twoweeks` globally linked (via `bun link`), so prompts show `$ twoweeks ...` instead of `$ bun run src/cli.ts ...`. Pacing extended: 0.8-2.6s pauses around each command, 4.5s hold on the brag card. Theme switched to Dracula. Result: 106KB gif with clearly visible result card showing `198.3Kx` compression and the "Six-figure compression. Your AI is in stage one of grief." milestone.
+- **package.json polish:** bumped to 0.3.0, dropped `engines.bun` in favor of `engines.node`, added `@types/node` to devDependencies.
+- **README rewrite:** test badge added, install section simplified (no more Bun-warning), `--json` examples with `jq` piping, milestones table expanded to 11 rows (added sub-1x and instant cases), storage note updated for JSON.
+- **Tests bumped to 39** (added 2 for the new ratio behavior). Tests pass under `bun test`. CI will also run them under Node when triggered.
+
+Skipped from feedback:
+- Static result-card PNG. agg's gif renderer overlays frames in a way that produces unclean stills; would need a separate cast or a different tool to generate. Animated gif covers the same role for the README. Tag as v0.4 polish.
+- Homebrew tap stub. Spec defers to v1.1.
+
+Spawning reviewer for round 2.
+

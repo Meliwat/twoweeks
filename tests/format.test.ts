@@ -36,31 +36,41 @@ describe("humanDuration", () => {
 });
 
 describe("formatRatio", () => {
-  test("small numbers", () => {
+  test("integer ratio above 10", () => {
     expect(formatRatio(425)).toBe("425x");
   });
 
-  test("thousands", () => {
+  test("ratio between 1 and 10 gets 2 decimals", () => {
+    expect(formatRatio(1.5)).toBe("1.50x");
+    expect(formatRatio(9.99)).toBe("9.99x");
+  });
+
+  test("ratio between 10 and 1000 rounds to integer", () => {
+    expect(formatRatio(12.7)).toBe("13x");
+  });
+
+  test("thousands compact", () => {
     expect(formatRatio(1234)).toBe("1.2Kx");
   });
 
-  test("millions", () => {
+  test("millions compact", () => {
     expect(formatRatio(31_015_385)).toBe("31.0Mx");
+  });
+
+  test("sub-1 ratio gets 3 decimals (over-budget case)", () => {
+    expect(formatRatio(0.5)).toBe("0.500x");
+    expect(formatRatio(0.123)).toBe("0.123x");
   });
 
   test("infinity", () => {
     expect(formatRatio(Infinity)).toBe("∞x");
   });
 
-  test("1", () => {
-    expect(formatRatio(1)).toBe("1x");
+  test("ratio of exactly 1", () => {
+    expect(formatRatio(1)).toBe("1.00x");
   });
 
-  test("boundary 999 stays normal", () => {
-    expect(formatRatio(999)).toBe("999x");
-  });
-
-  test("boundary 1000 goes K", () => {
+  test("boundary at 1000 goes to Kx", () => {
     expect(formatRatio(1000)).toBe("1.0Kx");
   });
 });
@@ -78,9 +88,10 @@ describe("computeRatio", () => {
     };
   }
 
-  test("typical case (47 minutes vs 2 weeks)", () => {
+  test("typical case (47 minutes vs 2 weeks) ~= 428.5", () => {
     const ratio = computeRatio(sessionWith(47 * 60 * 1000));
-    expect(ratio).toBe(429);
+    expect(ratio).toBeGreaterThan(428);
+    expect(ratio).toBeLessThan(429);
   });
 
   test("instant ship returns Infinity", () => {
@@ -105,8 +116,8 @@ describe("computeRatio", () => {
     expect(computeRatio(sessionWith(1209600000))).toBe(1);
   });
 
-  test("over-budget returns sub-1 ratio rounded", () => {
-    // shipped at 2x the ETA → 0.5 → rounded to 1 (Math.round rounds half-to-even, but 0.5 → 1 here)
-    expect(computeRatio(sessionWith(2 * 1209600000))).toBeLessThanOrEqual(1);
+  test("over-budget returns sub-1 ratio (the funny case)", () => {
+    const ratio = computeRatio(sessionWith(2 * 1209600000));
+    expect(ratio).toBe(0.5);
   });
 });

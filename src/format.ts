@@ -34,22 +34,31 @@ export function compactRemaining(session: Session): string {
   return c.brightCyan(humanDuration(remaining));
 }
 
+/**
+ * Compression ratio as a float (eta / actual). Caller chooses precision via formatRatio.
+ */
 export function computeRatio(session: Session): number {
-  if (!session.shipped_at) throw new Error("Session not shipped");
+  if (session.shipped_at === null || session.shipped_at === undefined) {
+    throw new Error("Session not shipped");
+  }
   const actualMs = session.shipped_at - session.started_at;
   if (actualMs <= 0) return Infinity;
-  return Math.round(session.eta_ms / actualMs);
+  return session.eta_ms / actualMs;
 }
 
 export function formatRatio(ratio: number): string {
   if (!isFinite(ratio)) return "∞x";
   if (ratio >= 1_000_000) return `${(ratio / 1_000_000).toFixed(1)}Mx`;
   if (ratio >= 1_000) return `${(ratio / 1000).toFixed(1)}Kx`;
-  return `${ratio}x`;
+  if (ratio >= 10) return `${Math.round(ratio)}x`;
+  if (ratio >= 1) return `${ratio.toFixed(2)}x`;
+  return `${ratio.toFixed(3)}x`;
 }
 
 export function resultCard(session: Session, milestone?: string): string {
-  if (!session.shipped_at) throw new Error("Session not shipped");
+  if (session.shipped_at === null || session.shipped_at === undefined) {
+    throw new Error("Session not shipped");
+  }
   const actualMs = session.shipped_at - session.started_at;
   const ratio = computeRatio(session);
   const saved = Math.max(0, session.eta_ms - actualMs);
@@ -65,8 +74,8 @@ export function resultCard(session: Session, milestone?: string): string {
     `${label("Task:")}        ${c.bold(task)}`,
     `${label("Estimated:")}   ${c.italic(session.eta_text)}`,
     `${label("Actual:")}      ${c.brightYellow(humanDuration(actualMs))}`,
-    `${label("Compression:")} ${c.brightGreen(c.bold(ratioText))} ${c.dim("faster than the AI thought")}`,
-    `${label("Saved:")}       ${c.green(humanDuration(saved))}`,
+    `${label("Compression:")} ${c.brightGreen(c.bold(ratioText))} ${c.dim(ratio >= 1 ? "faster than the AI thought" : "(the AI, against all odds, was right)")}`,
+    `${label(saved > 0 ? "Saved:" : "Cost:")}       ${saved > 0 ? c.green(humanDuration(saved)) : c.red(humanDuration(actualMs - session.eta_ms))}`,
     rule,
   ];
   if (milestone) {

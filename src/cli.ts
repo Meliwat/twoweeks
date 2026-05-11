@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { start } from "./commands/start.ts";
 import { status } from "./commands/status.ts";
 import { ship } from "./commands/ship.ts";
@@ -8,7 +8,7 @@ import { history } from "./commands/history.ts";
 import { c } from "./colors.ts";
 import type { ShareTarget } from "./commands/share.ts";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}
@@ -31,13 +31,15 @@ ${c.bold("Flags:")}
   ${c.bold("--to-bluesky")}                Share to Bluesky instead of X
   ${c.bold("--to-mastodon")}               Share to Mastodon instead of X
   ${c.bold("--print")}                     Print the share URL instead of opening
+  ${c.bold("--json")}                      Emit machine-readable JSON (status, ship, history, share)
   ${c.bold("--no-color")}                  Disable ANSI colors (also set ${c.italic("NO_COLOR=1")})
   ${c.bold("--help, -h")}                  Show this help
   ${c.bold("--version, -v")}               Show version
 
 ${c.bold("Storage:")}
-  ${c.dim("~/.twoweeks/history.db")}      ${c.dim("local SQLite, no telemetry, no cloud")}
+  ${c.dim("~/.twoweeks/history.json")}    ${c.dim("local JSON, no telemetry, no cloud")}
   ${c.dim("$TWOWEEKS_HOME")}              ${c.dim("override storage directory")}
+  ${c.dim("$TWOWEEKS_DEBUG")}             ${c.dim("=1 prints stack on unexpected errors")}
 `;
 
 interface ParsedArgs {
@@ -46,11 +48,12 @@ interface ParsedArgs {
   share?: boolean;
   force?: boolean;
   print?: boolean;
+  json?: boolean;
   eta?: string;
   shareTarget?: ShareTarget;
 }
 
-function parseArgs(argv: string[]): { args: ParsedArgs; positional: string[] } {
+export function parseArgs(argv: string[]): { args: ParsedArgs; positional: string[] } {
   const args: ParsedArgs = {};
   const positional: string[] = [];
 
@@ -61,11 +64,11 @@ function parseArgs(argv: string[]): { args: ParsedArgs; positional: string[] } {
     else if (a === "--share") args.share = true;
     else if (a === "--force") args.force = true;
     else if (a === "--print") args.print = true;
+    else if (a === "--json") args.json = true;
     else if (a === "--to-bluesky") args.shareTarget = "bluesky";
     else if (a === "--to-mastodon") args.shareTarget = "mastodon";
     else if (a === "--to-x" || a === "--to-twitter") args.shareTarget = "x";
     else if (a === "--no-color") {
-      // Handled by colors.ts via NO_COLOR env, but accept the flag too.
       process.env.NO_COLOR = "1";
     } else if (a === "--eta") {
       args.eta = argv[i + 1];
@@ -79,8 +82,14 @@ function parseArgs(argv: string[]): { args: ParsedArgs; positional: string[] } {
   return { args, positional };
 }
 
+function isTruthy(value: string | undefined): boolean {
+  if (value === undefined || value === "") return false;
+  const v = value.toLowerCase();
+  return v !== "0" && v !== "false" && v !== "no" && v !== "off";
+}
+
 function main(): number {
-  const { args, positional } = parseArgs(Bun.argv.slice(2));
+  const { args, positional } = parseArgs(process.argv.slice(2));
 
   if (args.help) {
     console.log(HELP);
@@ -94,11 +103,15 @@ function main(): number {
   const command = positional[0];
 
   if (!command || command === "status") {
-    return status();
+    return status({ json: !!args.json });
   }
 
   if (command === "ship") {
-    return ship({ share: !!args.share, shareTarget: args.shareTarget });
+    return ship({
+      share: !!args.share,
+      shareTarget: args.shareTarget,
+      json: !!args.json,
+    });
   }
 
   if (command === "share") {
@@ -110,33 +123,43 @@ function main(): number {
         return 1;
       }
     }
-    return share({ id, target: args.shareTarget, print: args.print });
+    return share({
+      id,
+      target: args.shareTarget,
+      print: args.print,
+      json: !!args.json,
+    });
   }
 
   if (command === "abandon") {
-    return abandon();
+    return abandon({ json: !!args.json });
   }
 
   if (command === "history" || command === "board") {
-    return history();
+    return history({ json: !!args.json });
   }
 
-  // Otherwise treat the first positional as the task
   return start({
     task: command,
     eta: args.eta,
     force: !!args.force,
+    json: !!args.json,
   });
 }
 
 try {
   process.exit(main());
 } catch (err) {
-  console.error(c.brightRed("Unexpected error:") + " " + (err as Error).message);
-  if (process.env.TWOWEEKS_DEBUG) {
-    console.error((err as Error).stack);
+  const e = err as Error;
+  if (process.argv.includes("--json")) {
+    console.error(JSON.stringify({ ok: false, error: e.message }));
   } else {
-    console.error(c.dim("(set TWOWEEKS_DEBUG=1 for full stack trace)"));
+    console.error(c.brightRed("Unexpected error:") + " " + e.message);
+    if (isTruthy(process.env.TWOWEEKS_DEBUG)) {
+      console.error(e.stack);
+    } else {
+      console.error(c.dim("(set TWOWEEKS_DEBUG=1 for full stack trace)"));
+    }
   }
   process.exit(1);
 }

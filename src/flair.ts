@@ -56,7 +56,10 @@ export function milestoneFor(ratio: number): string | undefined {
     return "📈  Faster than estimated. The AI quietly updates its priors.";
   }
   if (ratio >= 1) {
-    return "🤝  Exactly on time. The AI feels seen.";
+    return "🤝  Within a hair of the estimate. The AI feels seen.";
   }
-  return "🐢  Slower than estimated. The AI was, against all odds, right.";
+  if (ratio >= 0.5) {
+    return "🐢  Slower than estimated, but not by much. The AI was almost right.";
+  }
+  return "🦥  Significantly slower than estimated. The AI was, against all odds, correct.";
 }

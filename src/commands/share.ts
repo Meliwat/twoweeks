@@ -10,7 +10,9 @@ export type ShareTarget = "x" | "bluesky" | "mastodon";
 const REPO_URL = "https://github.com/Meliwat/twoweeks";
 
 function shareText(session: Session): string {
-  if (!session.shipped_at) throw new Error("Cannot share unshipped session");
+  if (session.shipped_at === null || session.shipped_at === undefined) {
+    throw new Error("Cannot share unshipped session");
+  }
   const actualMs = session.shipped_at - session.started_at;
   const ratio = computeRatio(session);
   const duration = humanDuration(actualMs);
@@ -27,7 +29,6 @@ export function buildShareUrl(session: Session, target: ShareTarget = "x"): stri
     case "bluesky":
       return `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`;
     case "mastodon":
-      // Generic mastodon share opens the user's chosen instance via Share to
       return `https://toot.kytta.dev/?text=${encodeURIComponent(text)}`;
   }
 }
@@ -46,21 +47,35 @@ export interface ShareArgs {
   id?: number;
   target?: ShareTarget;
   print?: boolean;
+  json?: boolean;
 }
 
 export function share(args: ShareArgs): number {
   const session =
     args.id !== undefined ? getSessionById(args.id) : getMostRecentShipped();
   if (!session) {
-    console.error(c.brightRed("Error:") + " no shipped session to share. Ship one first with: " + c.bold("twoweeks ship"));
+    if (args.json) {
+      console.error(JSON.stringify({ ok: false, error: "no_shipped_session" }));
+    } else {
+      console.error(c.brightRed("Error:") + " no shipped session to share. Ship one first with: " + c.bold("twoweeks ship"));
+    }
     return 1;
   }
-  if (!session.shipped_at) {
-    console.error(c.brightRed("Error:") + ` session ${session.id} ("${session.task}") hasn't shipped yet.`);
+  if (session.shipped_at === null || session.shipped_at === undefined) {
+    if (args.json) {
+      console.error(JSON.stringify({ ok: false, error: "session_not_shipped", id: session.id }));
+    } else {
+      console.error(c.brightRed("Error:") + ` session ${session.id} ("${session.task}") hasn't shipped yet.`);
+    }
     return 1;
   }
   const target: ShareTarget = args.target ?? "x";
   const url = buildShareUrl(session, target);
+
+  if (args.json) {
+    console.log(JSON.stringify({ ok: true, url, target, session_id: session.id }));
+    return 0;
+  }
 
   if (args.print) {
     console.log(url);

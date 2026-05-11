@@ -1,29 +1,14 @@
-import { Database } from "bun:sqlite";
-import { mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
 const DB_DIR_OVERRIDE = process.env.TWOWEEKS_HOME;
 const DB_DIR = DB_DIR_OVERRIDE ?? join(homedir(), ".twoweeks");
-const DB_PATH = join(DB_DIR, "history.db");
+const DB_PATH = join(DB_DIR, "history.json");
 
 if (!existsSync(DB_DIR)) {
   mkdirSync(DB_DIR, { recursive: true });
 }
-
-const db = new Database(DB_PATH);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS sessions (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    task        TEXT NOT NULL,
-    eta_text    TEXT NOT NULL DEFAULT '2 weeks',
-    eta_ms      INTEGER NOT NULL DEFAULT 1209600000,
-    started_at  INTEGER NOT NULL,
-    shipped_at  INTEGER,
-    abandoned   INTEGER NOT NULL DEFAULT 0
-  );
-`);
 
 export interface Session {
   id: number;
@@ -35,91 +20,116 @@ export interface Session {
   abandoned: number;
 }
 
+interface Store {
+  version: 1;
+  next_id: number;
+  sessions: Session[];
+}
+
+function load(): Store {
+  if (!existsSync(DB_PATH)) {
+    return { version: 1, next_id: 1, sessions: [] };
+  }
+  try {
+    const raw = readFileSync(DB_PATH, "utf-8");
+    const parsed = JSON.parse(raw) as Store;
+    if (!parsed.sessions || typeof parsed.next_id !== "number") {
+      return { version: 1, next_id: 1, sessions: [] };
+    }
+    return parsed;
+  } catch {
+    return { version: 1, next_id: 1, sessions: [] };
+  }
+}
+
+function save(store: Store): void {
+  writeFileSync(DB_PATH, JSON.stringify(store, null, 2));
+}
+
 export function createSession(task: string, etaText: string, etaMs: number): Session {
-  const result = db
-    .query(
-      "INSERT INTO sessions (task, eta_text, eta_ms, started_at) VALUES (?, ?, ?, ?)"
-    )
-    .run(task, etaText, etaMs, Date.now());
-  const session = getSessionById(Number(result.lastInsertRowid));
-  if (!session) throw new Error("Failed to create session");
+  const store = load();
+  const session: Session = {
+    id: store.next_id,
+    task,
+    eta_text: etaText,
+    eta_ms: etaMs,
+    started_at: Date.now(),
+    shipped_at: null,
+    abandoned: 0,
+  };
+  store.sessions.push(session);
+  store.next_id++;
+  save(store);
   return session;
 }
 
 export function getActiveSessions(): Session[] {
-  return db
-    .query(
-      "SELECT * FROM sessions WHERE shipped_at IS NULL AND abandoned = 0 ORDER BY started_at DESC"
-    )
-    .all() as Session[];
+  const { sessions } = load();
+  return sessions
+    .filter((s) => s.shipped_at === null && s.abandoned === 0)
+    .sort((a, b) => b.started_at - a.started_at);
 }
 
 export function getMostRecentActive(): Session | null {
-  return (db
-    .query(
-      "SELECT * FROM sessions WHERE shipped_at IS NULL AND abandoned = 0 ORDER BY started_at DESC LIMIT 1"
-    )
-    .get() as Session | null) ?? null;
+  return getActiveSessions()[0] ?? null;
 }
 
 export function getSessionById(id: number): Session | null {
-  return (db
-    .query("SELECT * FROM sessions WHERE id = ?")
-    .get(id) as Session | null) ?? null;
+  const { sessions } = load();
+  return sessions.find((s) => s.id === id) ?? null;
 }
 
 export function shipSession(id: number): Session | null {
-  db.query(
-    "UPDATE sessions SET shipped_at = ? WHERE id = ? AND shipped_at IS NULL AND abandoned = 0"
-  ).run(Date.now(), id);
-  return getSessionById(id);
+  const store = load();
+  const session = store.sessions.find((s) => s.id === id);
+  if (!session || session.shipped_at !== null || session.abandoned === 1) {
+    return session ?? null;
+  }
+  session.shipped_at = Date.now();
+  save(store);
+  return session;
 }
 
 export function abandonSession(id: number): Session | null {
-  db.query("UPDATE sessions SET abandoned = 1 WHERE id = ?").run(id);
-  return getSessionById(id);
+  const store = load();
+  const session = store.sessions.find((s) => s.id === id);
+  if (!session) return null;
+  session.abandoned = 1;
+  save(store);
+  return session;
 }
 
 export function getMostRecentShipped(): Session | null {
-  return (db
-    .query(
-      "SELECT * FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0 ORDER BY shipped_at DESC LIMIT 1"
-    )
-    .get() as Session | null) ?? null;
+  return getAllShipped()[0] ?? null;
 }
 
 export function getAllShipped(): Session[] {
-  return db
-    .query(
-      "SELECT * FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0 ORDER BY shipped_at DESC"
-    )
-    .all() as Session[];
+  const { sessions } = load();
+  return sessions
+    .filter((s) => s.shipped_at !== null && s.abandoned === 0)
+    .sort((a, b) => (b.shipped_at as number) - (a.shipped_at as number));
 }
 
-export function getStats(): {
+export interface DbStats {
   total: number;
   shipped: number;
   abandoned: number;
   totalSavedMs: number;
-} {
-  const totalRow = db
-    .query("SELECT COUNT(*) as n FROM sessions")
-    .get() as { n: number };
-  const shippedRow = db
-    .query("SELECT COUNT(*) as n FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0")
-    .get() as { n: number };
-  const abandonedRow = db
-    .query("SELECT COUNT(*) as n FROM sessions WHERE abandoned = 1")
-    .get() as { n: number };
-  const savedRow = db
-    .query(
-      "SELECT SUM(eta_ms - (shipped_at - started_at)) as ms FROM sessions WHERE shipped_at IS NOT NULL AND abandoned = 0 AND (shipped_at - started_at) < eta_ms"
-    )
-    .get() as { ms: number | null };
+}
+
+export function getStats(): DbStats {
+  const { sessions } = load();
+  const shipped = sessions.filter((s) => s.shipped_at !== null && s.abandoned === 0);
+  const abandoned = sessions.filter((s) => s.abandoned === 1);
+  let totalSavedMs = 0;
+  for (const s of shipped) {
+    const actual = (s.shipped_at as number) - s.started_at;
+    if (actual < s.eta_ms) totalSavedMs += s.eta_ms - actual;
+  }
   return {
-    total: totalRow.n,
-    shipped: shippedRow.n,
-    abandoned: abandonedRow.n,
-    totalSavedMs: savedRow.ms ?? 0,
+    total: sessions.length,
+    shipped: shipped.length,
+    abandoned: abandoned.length,
+    totalSavedMs,
   };
 }

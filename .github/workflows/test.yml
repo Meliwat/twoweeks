@@ -1,0 +1,53 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build dist
+        run: bun run build
+
+      - name: Smoke test built CLI under Bun
+        run: |
+          export TWOWEEKS_HOME=/tmp/tw-smoke-$$
+          bun ./dist/cli.js --version
+          bun ./dist/cli.js "smoke test"
+          bun ./dist/cli.js ship --json > /tmp/ship.json
+          cat /tmp/ship.json
+          # Verify JSON is valid
+          bun -e "JSON.parse(require('fs').readFileSync('/tmp/ship.json', 'utf-8'))"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Smoke test built CLI under Node
+        run: |
+          export TWOWEEKS_HOME=/tmp/tw-smoke-node-$$
+          node ./dist/cli.js --version
+          node ./dist/cli.js "smoke test"
+          node ./dist/cli.js ship --json | tee /tmp/ship.json
+          node -e "JSON.parse(require('fs').readFileSync('/tmp/ship.json', 'utf-8'))"
