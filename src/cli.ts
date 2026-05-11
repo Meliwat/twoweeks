@@ -11,7 +11,7 @@ import { installHook } from "./commands/install-hook.ts";
 import { c } from "./colors.ts";
 import type { ShareTarget } from "./commands/share.ts";
 
-const VERSION = "0.7.1";
+const VERSION = "0.7.2";
 
 const HELP = `
 ${c.brightGreen(c.bold("twoweeks"))} ${c.dim(`v${VERSION}`)}

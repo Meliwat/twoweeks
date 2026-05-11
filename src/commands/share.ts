@@ -10,19 +10,20 @@ export type ShareTarget = "x" | "bluesky" | "mastodon";
 const REPO_URL = "https://github.com/Meliwat/twoweeks";
 
 // Five share-text variants. Algorithms downrank near-duplicate text, so
-// randomize per share. Each variant keeps the receipts (eta, actual, ratio) and
-// a link to the repo so the brag is recruiting.
+// randomize per share. Pattern: the AI estimated, and the AI delivered — both
+// sides of the comparison are the AI, which makes the gap funnier and the
+// receipts cleaner.
 const SHARE_VARIANTS: Array<(args: { eta: string; ratio: string; duration: string; quote?: string; challenge?: string }) => string> = [
   ({ eta, ratio, duration, quote }) =>
-    `My AI said "${eta}". I shipped in ${duration}.\n\nCompression: ${ratio}.${quote ? `\n\nThe AI's exact words: "${quote}"` : ""}\n\ntwoweeks ⚙️ ${REPO_URL}`,
+    `AI said "${eta}". Also AI: shipped in ${duration}.\n\nCompression: ${ratio}.${quote ? `\n\nThe AI's exact words: "${quote}"` : ""}\n\ntwoweeks ⚙️ ${REPO_URL}`,
   ({ eta, ratio, duration }) =>
-    `I beat my AI's "${eta}" estimate by ${ratio}.\n\nActual ship time: ${duration}.\n\ntwoweeks ⚙️ ${REPO_URL}`,
+    `AI estimate: "${eta}".\nAI delivery: ${duration}.\n\nAI beat AI by ${ratio}.\n\ntwoweeks ⚙️ ${REPO_URL}`,
   ({ eta, ratio, duration }) =>
-    `AI: "About ${eta} of focused work."\nMe: ${duration}.\n\n${ratio} faster than predicted.\n\n${REPO_URL}`,
+    `AI: "About ${eta} of focused work."\nAlso AI: ${duration}.\n\n${ratio} faster than the AI predicted itself would be.\n\n${REPO_URL}`,
   ({ eta, ratio, duration }) =>
-    `${ratio} compression on today's ship.\n\nThe AI quoted ${eta}. I quoted ${duration}.\n\n${REPO_URL}`,
+    `${ratio} compression on today's ship.\n\nThe AI quoted ${eta}. The AI shipped ${duration}.\n\n${REPO_URL}`,
   ({ eta, ratio, duration, challenge }) =>
-    `Just beat my AI's "${eta}" estimate by ${ratio} (shipped in ${duration}).${challenge ? `\n\n${challenge} bet you can't top this.` : ""}\n\n${REPO_URL}`,
+    `AI said "${eta}". AI shipped in ${duration}. ${ratio}.${challenge ? `\n\n${challenge} bet your AI can't top mine.` : ""}\n\n${REPO_URL}`,
 ];
 
 function pickShareVariant(session: Session, options: { challenge?: string } = {}): string {
